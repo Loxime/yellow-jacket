@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 
 import {
+  createServer
+} from 'node:http';
+
+import {
+  once
+} from 'node:events';
+
+
+import {
   mkdtemp,
   readFile,
   rm,
@@ -1582,7 +1591,7 @@ test(
 );
 
 test(
-  'baseline rejects partial run selectors',
+  'baseline selectors require explicit update mode',
   async (t) => {
     const directory =
       await mkdtemp(
@@ -1623,7 +1632,347 @@ test(
 
     assert.match(
       result.stderr,
-      /only supported by the run command/
+      /Baseline selectors require --update/
+    );
+  }
+);
+
+test(
+  'baseline --update requires a selector',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-baseline-update-empty-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    const result =
+      await runCli(
+        [
+          'baseline',
+          '--update'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      2
+    );
+
+    assert.match(
+      result.stderr,
+      /--update requires --route, --scenario or --tag/
+    );
+  }
+);
+
+test(
+  '--update is rejected outside baseline',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-update-invalid-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    const result =
+      await runCli(
+        [
+          'run',
+          '--update'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      2
+    );
+
+    assert.match(
+      result.stderr,
+      /--update is only supported by the baseline command/
+    );
+  }
+);
+
+test(
+  'baseline --update refreshes only selected snapshots',
+  async (t) => {
+    const requests:
+      string[] = [];
+
+    const server =
+      createServer(
+        (request, response) => {
+          requests.push(
+            request.url ??
+            ''
+          );
+
+          response.setHeader(
+            'content-type',
+            'application/json'
+          );
+
+          if (
+            request.url ===
+            '/health'
+          ) {
+            response.end(
+              JSON.stringify({
+                version:
+                  2
+              })
+            );
+
+            return;
+          }
+
+          response.end(
+            JSON.stringify({
+              preserved:
+                false
+            })
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => {
+        server.close();
+      }
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const baseUrl =
+      `http://127.0.0.1:${address.port}`;
+
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-baseline-update-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: ${JSON.stringify(baseUrl)},
+  baselinePath: './baseline.json',
+  routes: [
+    {
+      name: 'health',
+      path: '/health',
+      expect: {
+        status: 200
+      }
+    },
+    {
+      name: 'users',
+      path: '/users',
+      expect: {
+        status: 200
+      }
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'baseline.json'
+      ),
+      `${JSON.stringify(
+        {
+          formatVersion:
+            1,
+
+          createdAt:
+            new Date(0)
+              .toISOString(),
+
+          baseUrl,
+
+          responses: [
+            {
+              route:
+                'health',
+              method:
+                'GET',
+              url:
+                `${baseUrl}/health`,
+              status:
+                200,
+              contentType:
+                'application/json',
+              body: {
+                version:
+                  1
+              },
+              durationMs:
+                1
+            },
+            {
+              route:
+                'users',
+              method:
+                'GET',
+              url:
+                `${baseUrl}/users`,
+              status:
+                200,
+              contentType:
+                'application/json',
+              body: {
+                preserved:
+                  true
+              },
+              durationMs:
+                1
+            }
+          ]
+        },
+        null,
+        2
+      )}\n`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'baseline',
+          '--update',
+          '--route',
+          'health'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      0
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    assert.match(
+      result.stdout,
+      /Baseline updated at/
+    );
+
+    assert.deepEqual(
+      requests,
+      [
+        '/health'
+      ]
+    );
+
+    const baseline =
+      JSON.parse(
+        await readFile(
+          join(
+            directory,
+            'baseline.json'
+          ),
+          'utf8'
+        )
+      ) as {
+        responses: Array<{
+          route: string;
+          body: unknown;
+        }>;
+      };
+
+    assert.equal(
+      baseline.responses.length,
+      2
+    );
+
+    assert.deepEqual(
+      baseline.responses[0]?.body,
+      {
+        version:
+          2
+      }
+    );
+
+    assert.deepEqual(
+      baseline.responses[1]?.body,
+      {
+        preserved:
+          true
+      }
     );
   }
 );

@@ -129,6 +129,22 @@ export function baselinePath(
   );
 }
 
+function snapshotFromResult(
+  config: YellowJacketConfig,
+  result: RouteRunResult
+): ResponseSnapshot {
+  const {
+    passed: _passed,
+    error: _error,
+    ...snapshot
+  } = result;
+
+  return normalizeSnapshot(
+    snapshot,
+    config.compare
+  );
+}
+
 export async function writeBaseline(
   config: YellowJacketConfig,
   results: RouteRunResult[],
@@ -168,6 +184,108 @@ export async function writeBaseline(
     path,
     `${JSON.stringify(
       baseline,
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
+
+  return path;
+}
+
+export async function updateBaseline(
+  config: YellowJacketConfig,
+  baseline: BaselineFile,
+  results: RouteRunResult[],
+  cwd = process.cwd()
+): Promise<string> {
+  const path =
+    baselinePath(
+      config,
+      cwd
+    );
+
+  const replacements =
+    new Map<
+      string,
+      ResponseSnapshot
+    >();
+
+  for (
+    const result
+    of results
+  ) {
+    const snapshot =
+      snapshotFromResult(
+        config,
+        result
+      );
+
+    replacements.set(
+      `${snapshot.method} ${snapshot.route}`,
+      snapshot
+    );
+  }
+
+  const responses =
+    baseline.responses.map(
+      (snapshot) => {
+        const key =
+          `${snapshot.method} ${snapshot.route}`;
+
+        const replacement =
+          replacements.get(
+            key
+          );
+
+        if (
+          replacement ===
+          undefined
+        ) {
+          return snapshot;
+        }
+
+        replacements.delete(
+          key
+        );
+
+        return replacement;
+      }
+    );
+
+  responses.push(
+    ...replacements.values()
+  );
+
+  const updated:
+    BaselineFile = {
+      formatVersion:
+        1,
+
+      createdAt:
+        new Date()
+          .toISOString(),
+
+      baseUrl:
+        config.baseUrl,
+
+      responses
+    };
+
+  await mkdir(
+    dirname(
+      path
+    ),
+    {
+      recursive:
+        true
+    }
+  );
+
+  await writeFile(
+    path,
+    `${JSON.stringify(
+      updated,
       null,
       2
     )}\n`,

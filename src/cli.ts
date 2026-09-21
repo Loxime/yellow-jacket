@@ -30,6 +30,7 @@ import {
 import {
   compareWithBaseline,
   readBaseline,
+  updateBaseline,
   writeBaseline
 } from './core/baseline.js';
 
@@ -86,6 +87,9 @@ Usage:
   yellow-jacket run --github
   yellow-jacket run --gitlab --output yellow-jacket-run.xml
   yellow-jacket baseline [--allow-actions]
+  yellow-jacket baseline --update --route <name-or-path>
+  yellow-jacket baseline --update --scenario <name>
+  yellow-jacket baseline --update --tag <tag>
   yellow-jacket coverage
   yellow-jacket coverage --json
   yellow-jacket coverage --markdown
@@ -261,6 +265,9 @@ async function main():
         multiple: true
       },
       'allow-actions': {
+        type: 'boolean'
+      },
+      update: {
         type: 'boolean'
       },
       purge: {
@@ -543,14 +550,62 @@ async function main():
     };
 
   if (
+    values.update &&
+    command !==
+      'baseline'
+  ) {
+    console.error(
+      '--update is only supported by the baseline command.'
+    );
+
+    process.exitCode =
+      2;
+    return;
+  }
+
+  if (
+    values.update &&
+    !hasRunSelection(
+      selection
+    )
+  ) {
+    console.error(
+      '--update requires --route, --scenario or --tag.'
+    );
+
+    process.exitCode =
+      2;
+    return;
+  }
+
+  if (
+    command ===
+      'baseline' &&
+    hasRunSelection(
+      selection
+    ) &&
+    !values.update
+  ) {
+    console.error(
+      'Baseline selectors require --update to avoid replacing the complete baseline with a partial snapshot.'
+    );
+
+    process.exitCode =
+      2;
+    return;
+  }
+
+  if (
     hasRunSelection(
       selection
     ) &&
     command !==
-      'run'
+      'run' &&
+    command !==
+      'baseline'
   ) {
     console.error(
-      '--route, --scenario and --tag are only supported by the run command.'
+      '--route, --scenario and --tag are supported by run, or by baseline with --update.'
     );
 
     process.exitCode =
@@ -711,9 +766,17 @@ async function main():
     return;
   }
 
-  const selectedConfig =
+  const usesSelection =
     command ===
-      'run'
+      'run' ||
+    (
+      command ===
+        'baseline' &&
+      values.update
+    );
+
+  const selectedConfig =
+    usesSelection
       ? selectRunConfig(
           config,
           selection
@@ -721,8 +784,7 @@ async function main():
       : config;
 
   if (
-    command ===
-      'run' &&
+    usesSelection &&
     hasRunSelection(
       selection
     ) &&
@@ -783,6 +845,38 @@ async function main():
       );
 
       process.exitCode = 1;
+      return;
+    }
+
+    if (
+      values.update
+    ) {
+      const existing =
+        await readBaseline(
+          config
+        );
+
+      if (!existing) {
+        console.error(
+          'Cannot update baseline because no baseline exists. Run "yellow-jacket baseline" first.'
+        );
+
+        process.exitCode =
+          2;
+        return;
+      }
+
+      const path =
+        await updateBaseline(
+          config,
+          existing,
+          results
+        );
+
+      console.log(
+        `Baseline updated at ${path}`
+      );
+
       return;
     }
 

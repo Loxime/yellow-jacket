@@ -58,6 +58,7 @@ export {
   baselinePath,
   compareWithBaseline,
   readBaseline,
+  updateBaseline,
   writeBaseline
 } from './core/baseline.js';
 

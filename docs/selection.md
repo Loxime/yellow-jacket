@@ -108,3 +108,47 @@ is rejected rather than replacing a complete baseline with a partial snapshot.
 During a filtered `run`, Yellow Jacket filters the existing baseline to the
 selected routes and scenarios before comparison. Unselected baseline entries
 are therefore not reported as missing.
+
+## Updating selected baseline entries
+
+A normal baseline command always replaces the complete baseline:
+
+```bash
+yellow-jacket baseline
+```
+
+Yellow Jacket therefore rejects selectors on a normal baseline command.
+
+To intentionally refresh only part of an existing baseline, use `--update`:
+
+```bash
+yellow-jacket baseline \
+  --update \
+  --route health
+```
+
+The same mode works with scenarios and tags:
+
+```bash
+yellow-jacket baseline \
+  --update \
+  --scenario checkout
+
+yellow-jacket baseline \
+  --update \
+  --tag smoke
+```
+
+Partial updates preserve every unselected snapshot.
+
+Selected snapshots are replaced by their new response, while newly selected
+routes that were not already present are appended to the baseline.
+
+`--update` requires an existing baseline. If no baseline exists yet, create the
+complete one first:
+
+```bash
+yellow-jacket baseline
+```
+
+Route expectations must still pass before any baseline file is modified.
