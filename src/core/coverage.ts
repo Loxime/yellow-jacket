@@ -3,8 +3,13 @@ import {
 } from 'node:fs/promises';
 
 import {
+  dirname,
   resolve
 } from 'node:path';
+
+import {
+  fileURLToPath
+} from 'node:url';
 
 import type {
   CoverageMethod,
@@ -347,31 +352,11 @@ function unwrapCdata(
   );
 }
 
-function parseSitemapOperations(
+function sitemapLocations(
   xml: string
-): DeclaredOperation[] {
-  if (
-    /<(?:[A-Za-z_][\w.-]*:)?sitemapindex\b/i.test(
-      xml
-    )
-  ) {
-    throw new Error(
-      'Sitemap indexes are not supported yet. Configure a sitemap <urlset> file directly.'
-    );
-  }
-
-  if (
-    !/<(?:[A-Za-z_][\w.-]*:)?urlset\b/i.test(
-      xml
-    )
-  ) {
-    throw new Error(
-      'Sitemap file does not contain a valid <urlset>.'
-    );
-  }
-
-  const operations:
-    DeclaredOperation[] = [];
+): string[] {
+  const locations:
+    string[] = [];
 
   const pattern =
     /<(?:[A-Za-z_][\w.-]*:)?loc\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z_][\w.-]*:)?loc\s*>/gi;
@@ -394,20 +379,110 @@ function parseSitemapOperations(
         ).trim()
       );
 
-    if (!location) {
-      continue;
+    if (location) {
+      locations.push(
+        location
+      );
     }
-
-    operations.push({
-      method: 'GET',
-      path:
-        normalizeCoveragePath(
-          location
-        )
-    });
   }
 
-  return operations;
+  return locations;
+}
+
+type SitemapDocument =
+  | {
+      kind: 'urlset';
+      operations:
+        DeclaredOperation[];
+    }
+  | {
+      kind: 'index';
+      locations:
+        string[];
+    };
+
+function parseSitemapDocument(
+  xml: string
+): SitemapDocument {
+  if (
+    /<(?:[A-Za-z_][\w.-]*:)?sitemapindex\b/i.test(
+      xml
+    )
+  ) {
+    return {
+      kind:
+        'index',
+      locations:
+        sitemapLocations(
+          xml
+        )
+    };
+  }
+
+  if (
+    !/<(?:[A-Za-z_][\w.-]*:)?urlset\b/i.test(
+      xml
+    )
+  ) {
+    throw new Error(
+      'Sitemap file does not contain a valid <urlset> or <sitemapindex>.'
+    );
+  }
+
+  return {
+    kind:
+      'urlset',
+
+    operations:
+      sitemapLocations(
+        xml
+      ).map(
+        (location) => ({
+          method:
+            'GET',
+          path:
+            normalizeCoveragePath(
+              location
+            )
+        })
+      )
+  };
+}
+
+function resolveSitemapChild(
+  location: string,
+  parentPath: string
+): string {
+  if (
+    /^[A-Za-z][A-Za-z0-9+.-]*:/.test(
+      location
+    )
+  ) {
+    const url =
+      new URL(
+        location
+      );
+
+    if (
+      url.protocol ===
+      'file:'
+    ) {
+      return fileURLToPath(
+        url
+      );
+    }
+
+    throw new Error(
+      `Remote sitemap index entry is not supported: ${location}. Coverage discovery does not perform HTTP requests.`
+    );
+  }
+
+  return resolve(
+    dirname(
+      parentPath
+    ),
+    location
+  );
 }
 
 async function readCoverageFile(
@@ -446,6 +521,95 @@ async function readCoverageFile(
 
     throw error;
   }
+}
+
+async function readSitemapTree(
+  configuredPath: string,
+  cwd: string
+): Promise<{
+  operations:
+    DeclaredOperation[];
+  sources:
+    string[];
+}> {
+  const operations:
+    DeclaredOperation[] = [];
+
+  const sources:
+    string[] = [];
+
+  const visited =
+    new Set<string>();
+
+  async function visit(
+    sitemapPath: string
+  ): Promise<void> {
+    const absolutePath =
+      resolve(
+        cwd,
+        sitemapPath
+      );
+
+    if (
+      visited.has(
+        absolutePath
+      )
+    ) {
+      return;
+    }
+
+    visited.add(
+      absolutePath
+    );
+
+    const sitemap =
+      await readCoverageFile(
+        absolutePath,
+        cwd,
+        'Sitemap'
+      );
+
+    sources.push(
+      sitemap.path
+    );
+
+    const document =
+      parseSitemapDocument(
+        sitemap.content
+      );
+
+    if (
+      document.kind ===
+      'urlset'
+    ) {
+      operations.push(
+        ...document.operations
+      );
+
+      return;
+    }
+
+    for (
+      const location
+      of document.locations
+    ) {
+      await visit(
+        resolveSitemapChild(
+          location,
+          sitemap.path
+        )
+      );
+    }
+  }
+
+  await visit(
+    configuredPath
+  );
+
+  return {
+    operations,
+    sources
+  };
 }
 
 export async function buildCoverageReport(
@@ -527,18 +691,15 @@ export async function buildCoverageReport(
   }
 
   if (sitemapPath) {
-    const sitemap =
-      await readCoverageFile(
+    const sitemapTree =
+      await readSitemapTree(
         sitemapPath,
-        cwd,
-        'Sitemap'
+        cwd
       );
 
     for (
       const operation
-      of parseSitemapOperations(
-        sitemap.content
-      )
+      of sitemapTree.operations
     ) {
       const key =
         operationKey(
@@ -557,7 +718,7 @@ export async function buildCoverageReport(
     }
 
     sources.push(
-      sitemap.path
+      ...sitemapTree.sources
     );
   }
 

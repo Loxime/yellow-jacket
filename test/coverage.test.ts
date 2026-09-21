@@ -674,13 +674,160 @@ test(
 );
 
 test(
-  'rejects sitemap indexes until recursive sitemap discovery is supported',
+  'loads local sitemap indexes recursively',
   async (t) => {
     const directory =
       await mkdtemp(
         join(
           tmpdir(),
           'yellow-jacket-sitemap-index-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'sitemap.xml'
+      ),
+      `<?xml version="1.0"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>./pages.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>./nested.xml</loc>
+  </sitemap>
+</sitemapindex>
+`,
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'pages.xml'
+      ),
+      `<?xml version="1.0"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://example.test/</loc>
+  </url>
+  <url>
+    <loc>https://example.test/about</loc>
+  </url>
+</urlset>
+`,
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'nested.xml'
+      ),
+      `<?xml version="1.0"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>./blog.xml</loc>
+  </sitemap>
+</sitemapindex>
+`,
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'blog.xml'
+      ),
+      `<?xml version="1.0"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://example.test/blog</loc>
+  </url>
+</urlset>
+`,
+      'utf8'
+    );
+
+    const report =
+      await buildCoverageReport(
+        {
+          baseUrl:
+            'http://localhost',
+
+          coverage: {
+            sitemap:
+              './sitemap.xml'
+          },
+
+          routes: [
+            {
+              path:
+                '/'
+            },
+            {
+              path:
+                '/about'
+            },
+            {
+              path:
+                '/blog'
+            }
+          ]
+        },
+        directory
+      );
+
+    assert.equal(
+      report.total,
+      3
+    );
+
+    assert.equal(
+      report.covered,
+      3
+    );
+
+    assert.equal(
+      report.percentage,
+      100
+    );
+
+    assert.deepEqual(
+      report.operations.map(
+        (operation) =>
+          operation.path
+      ),
+      [
+        '/',
+        '/about',
+        '/blog'
+      ]
+    );
+  }
+);
+
+test(
+  'rejects remote entries inside sitemap indexes',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-remote-sitemap-'
         )
       );
 
@@ -726,7 +873,111 @@ test(
         },
         directory
       ),
-      /Sitemap indexes are not supported yet/
+      /does not perform HTTP requests/
+    );
+  }
+);
+
+test(
+  'handles cyclic local sitemap indexes',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cyclic-sitemap-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'a.xml'
+      ),
+      `<?xml version="1.0"?>
+<sitemapindex>
+  <sitemap>
+    <loc>./b.xml</loc>
+  </sitemap>
+</sitemapindex>
+`,
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'b.xml'
+      ),
+      `<?xml version="1.0"?>
+<sitemapindex>
+  <sitemap>
+    <loc>./a.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>./pages.xml</loc>
+  </sitemap>
+</sitemapindex>
+`,
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'pages.xml'
+      ),
+      `<?xml version="1.0"?>
+<urlset>
+  <url>
+    <loc>https://example.test/contact</loc>
+  </url>
+</urlset>
+`,
+      'utf8'
+    );
+
+    const report =
+      await buildCoverageReport(
+        {
+          baseUrl:
+            'http://localhost',
+
+          coverage: {
+            sitemap:
+              './a.xml'
+          },
+
+          routes: [
+            {
+              path:
+                '/contact'
+            }
+          ]
+        },
+        directory
+      );
+
+    assert.equal(
+      report.total,
+      1
+    );
+
+    assert.equal(
+      report.covered,
+      1
     );
   }
 );
