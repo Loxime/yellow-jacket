@@ -20,11 +20,17 @@ export interface RouteDefinition {
   expect?: RouteExpectation;
 }
 
+export interface CompareConfig {
+  ignore?: string[];
+  redact?: string[];
+}
+
 export interface YellowJacketConfig {
   baseUrl: string;
   timeoutMs?: number;
   headers?: Record<string, string>;
   baselinePath?: string;
+  compare?: CompareConfig;
   routes: RouteDefinition[];
 }
 
@@ -50,8 +56,21 @@ export interface BaselineFile {
   responses: ResponseSnapshot[];
 }
 
+export type BodyChangeKind =
+  | 'added'
+  | 'removed'
+  | 'changed';
+
+export interface BodyChange {
+  path: string;
+  kind: BodyChangeKind;
+  before?: unknown;
+  after?: unknown;
+}
+
 export interface Regression {
   route: string;
   method: HttpMethod;
   changes: string[];
+  bodyChanges?: BodyChange[];
 }

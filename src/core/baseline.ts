@@ -1,27 +1,48 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import {
+  mkdir,
+  readFile,
+  writeFile
+} from 'node:fs/promises';
+
+import {
+  dirname,
+  resolve
+} from 'node:path';
+
+import { diffBodies } from './diff.js';
+import { normalizeBody } from './normalize.js';
+
 import type {
   BaselineFile,
+  CompareConfig,
   Regression,
   ResponseSnapshot,
   RouteRunResult,
   YellowJacketConfig
 } from './types.js';
 
-function stable(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stable(record[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
+function normalizeSnapshot(
+  snapshot: ResponseSnapshot,
+  compare: CompareConfig | undefined
+): ResponseSnapshot {
+  return {
+    ...snapshot,
+    body: normalizeBody(
+      snapshot.body,
+      compare ?? {}
+    )
+  };
 }
 
-export function baselinePath(config: YellowJacketConfig, cwd = process.cwd()): string {
-  return resolve(cwd, config.baselinePath ?? '.yellow-jacket/snapshots/baseline.json');
+export function baselinePath(
+  config: YellowJacketConfig,
+  cwd = process.cwd()
+): string {
+  return resolve(
+    cwd,
+    config.baselinePath ??
+      '.yellow-jacket/snapshots/baseline.json'
+  );
 }
 
 export async function writeBaseline(
@@ -29,15 +50,46 @@ export async function writeBaseline(
   results: RouteRunResult[],
   cwd = process.cwd()
 ): Promise<string> {
-  const path = baselinePath(config, cwd);
-  await mkdir(dirname(path), { recursive: true });
+  const path = baselinePath(
+    config,
+    cwd
+  );
+
+  await mkdir(
+    dirname(path),
+    {
+      recursive: true
+    }
+  );
+
   const baseline: BaselineFile = {
     formatVersion: 1,
     createdAt: new Date().toISOString(),
     baseUrl: config.baseUrl,
-    responses: results.map(({ passed: _passed, error: _error, ...snapshot }) => snapshot)
+
+    responses: results.map(
+      ({
+        passed: _passed,
+        error: _error,
+        ...snapshot
+      }) =>
+        normalizeSnapshot(
+          snapshot,
+          config.compare
+        )
+    )
   };
-  await writeFile(path, `${JSON.stringify(baseline, null, 2)}\n`, 'utf8');
+
+  await writeFile(
+    path,
+    `${JSON.stringify(
+      baseline,
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
+
   return path;
 }
 
@@ -45,51 +97,127 @@ export async function readBaseline(
   config: YellowJacketConfig,
   cwd = process.cwd()
 ): Promise<BaselineFile | null> {
-  const path = baselinePath(config, cwd);
+  const path = baselinePath(
+    config,
+    cwd
+  );
+
   try {
-    return JSON.parse(await readFile(path, 'utf8')) as BaselineFile;
+    return JSON.parse(
+      await readFile(
+        path,
+        'utf8'
+      )
+    ) as BaselineFile;
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT') return null;
+    const code = (
+      error as NodeJS.ErrnoException
+    ).code;
+
+    if (code === 'ENOENT') {
+      return null;
+    }
+
     throw error;
   }
 }
 
 export function compareWithBaseline(
   baseline: BaselineFile,
-  results: RouteRunResult[]
+  results: RouteRunResult[],
+  compare?: CompareConfig
 ): Regression[] {
-  const expected = new Map<string, ResponseSnapshot>();
+  const expected =
+    new Map<
+      string,
+      ResponseSnapshot
+    >();
+
   for (const item of baseline.responses) {
-    expected.set(`${item.method} ${item.route}`, item);
+    expected.set(
+      `${item.method} ${item.route}`,
+      item
+    );
   }
 
   const regressions: Regression[] = [];
-  for (const current of results) {
-    const key = `${current.method} ${current.route}`;
-    const previous = expected.get(key);
-    if (!previous) {
+
+  for (const currentRaw of results) {
+    const current =
+      normalizeSnapshot(
+        currentRaw,
+        compare
+      );
+
+    const key =
+      `${current.method} ${current.route}`;
+
+    const previousRaw =
+      expected.get(key);
+
+    if (!previousRaw) {
       regressions.push({
         route: current.route,
         method: current.method,
-        changes: ['route was not present in baseline']
+        changes: [
+          'route was not present in baseline'
+        ]
       });
+
       continue;
     }
 
+    const previous =
+      normalizeSnapshot(
+        previousRaw,
+        compare
+      );
+
     const changes: string[] = [];
-    if (previous.status !== current.status) {
-      changes.push(`status ${previous.status} -> ${current.status}`);
+
+    if (
+      previous.status !==
+      current.status
+    ) {
+      changes.push(
+        `status ${previous.status} -> ${current.status}`
+      );
     }
-    if (stable(previous.body) !== stable(current.body)) {
-      changes.push('response body changed');
+
+    const bodyChanges =
+      diffBodies(
+        previous.body,
+        current.body
+      );
+
+    if (bodyChanges.length > 0) {
+      changes.push(
+        'response body changed'
+      );
     }
-    if (previous.contentType !== current.contentType) {
-      changes.push(`content-type ${String(previous.contentType)} -> ${String(current.contentType)}`);
+
+    if (
+      previous.contentType !==
+      current.contentType
+    ) {
+      changes.push(
+        `content-type ${String(
+          previous.contentType
+        )} -> ${String(
+          current.contentType
+        )}`
+      );
     }
 
     if (changes.length > 0) {
-      regressions.push({ route: current.route, method: current.method, changes });
+      regressions.push({
+        route: current.route,
+        method: current.method,
+        changes,
+        ...(bodyChanges.length > 0
+          ? { bodyChanges }
+          : {})
+      });
     }
   }
 

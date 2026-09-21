@@ -75,10 +75,44 @@ async function main(): Promise<void> {
   }
 
   const baseline = await readBaseline(config);
-  const regressions = baseline ? compareWithBaseline(baseline, results) : [];
+  const regressions = baseline
+    ? compareWithBaseline(
+        baseline,
+        results,
+        config.compare
+      )
+    : [];
 
   for (const regression of regressions) {
-    console.error(`△ ${regression.method} ${regression.route}: ${regression.changes.join(', ')}`);
+    console.error(
+      `△ ${regression.method} ${regression.route}`
+    );
+
+    for (const change of regression.changes) {
+      if (change !== 'response body changed') {
+        console.error(`  ${change}`);
+      }
+    }
+
+    for (const change of regression.bodyChanges ?? []) {
+      if (change.kind === 'changed') {
+        console.error(`  ${change.path}`);
+        console.error(
+          `  - ${JSON.stringify(change.before)}`
+        );
+        console.error(
+          `  + ${JSON.stringify(change.after)}`
+        );
+      } else if (change.kind === 'added') {
+        console.error(
+          `  + ${change.path}: ${JSON.stringify(change.after)}`
+        );
+      } else {
+        console.error(
+          `  - ${change.path}: ${JSON.stringify(change.before)}`
+        );
+      }
+    }
   }
 
   if (!baseline) {

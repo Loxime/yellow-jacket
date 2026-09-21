@@ -1,6 +1,7 @@
 import { access } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
+import { parseJsonPath } from './normalize.js';
 import type { YellowJacketConfig } from './types.js';
 
 const CONFIG_FILES = [
@@ -41,6 +42,13 @@ export async function loadConfig(cwd = process.cwd()): Promise<YellowJacketConfi
 
   if (!imported.default.baseUrl || !Array.isArray(imported.default.routes)) {
     throw new Error(`${path} must define baseUrl and routes.`);
+  }
+
+  for (const comparePath of [
+    ...(imported.default.compare?.ignore ?? []),
+    ...(imported.default.compare?.redact ?? [])
+  ]) {
+    parseJsonPath(comparePath);
   }
 
   return imported.default;

@@ -6,6 +6,18 @@ const CONFIG_TEMPLATE = `import { defineConfig } from 'yellow-jacket';
 export default defineConfig({
   baseUrl: process.env.YELLOW_JACKET_URL ?? 'http://localhost:3000',
   timeoutMs: 10_000,
+
+  compare: {
+    ignore: [
+      // '$.createdAt',
+      // '$.updatedAt'
+    ],
+    redact: [
+      // '$.token',
+      // '$.password'
+    ]
+  },
+
   routes: [
     {
       name: 'home',
