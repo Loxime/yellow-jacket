@@ -167,3 +167,19 @@ mutating requests.
 
 Continue with [Configuration](/configuration) to declare routes, comparison
 rules and coverage sources.
+
+## Remove Yellow Jacket
+
+To remove the integration while preserving configuration and snapshots:
+
+```bash
+yellow-jacket desetup
+```
+
+For a complete removal:
+
+```bash
+yellow-jacket desetup --purge
+```
+
+See [Desetup / uninstall](/desetup) for the exact cleanup behavior.

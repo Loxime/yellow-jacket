@@ -19,6 +19,10 @@ import {
 } from './commands/init.js';
 
 import {
+  desetupProject
+} from './commands/desetup.js';
+
+import {
   compareWithBaseline,
   readBaseline,
   writeBaseline
@@ -55,6 +59,8 @@ function printHelp(): void {
 Usage:
   yellow-jacket init
   yellow-jacket install
+  yellow-jacket desetup [--purge]
+  yellow-jacket uninstall [--purge]
   yellow-jacket run [--allow-actions]
   yellow-jacket baseline [--allow-actions]
   yellow-jacket coverage
@@ -66,6 +72,8 @@ Usage:
 Commands:
   init      Create a local yellow-jacket configuration.
   install   Install the Git pre-push hook.
+  desetup   Remove Yellow Jacket from the current project.
+  uninstall Alias for desetup.
   run       Execute routes and compare them with the baseline when available.
   baseline  Execute routes and save their current responses as the baseline.
   coverage  Compare configured requests with coverage route inventories.
@@ -171,6 +179,9 @@ async function main():
       },
       'allow-actions': {
         type: 'boolean'
+      },
+      purge: {
+        type: 'boolean'
       }
     }
   });
@@ -223,6 +234,59 @@ async function main():
     console.log(
       `core.hooksPath: ${installed.hooksPath}`
     );
+
+    return;
+  }
+
+  if (
+    command === 'desetup' ||
+    command === 'uninstall'
+  ) {
+    const result =
+      await desetupProject(
+        process.cwd(),
+        {
+          purge:
+            values.purge ??
+            false
+        }
+      );
+
+    console.log(
+      'yellow-jacket removed from this project.'
+    );
+
+    for (
+      const item
+      of result.removed
+    ) {
+      console.log(
+        `Removed: ${item}`
+      );
+    }
+
+    if (
+      result.preserved.length >
+      0
+    ) {
+      console.log('');
+      console.log('Preserved:');
+
+      for (
+        const item
+        of result.preserved
+      ) {
+        console.log(
+          `  ${item}`
+        );
+      }
+
+      console.log('');
+
+      console.log(
+        'Use "yellow-jacket desetup --purge" to remove preserved configuration and snapshots.'
+      );
+    }
 
     return;
   }
@@ -320,6 +384,17 @@ async function main():
   ) {
     console.error(
       '--output requires --json, --markdown or --html.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
+  if (
+    values.purge
+  ) {
+    console.error(
+      '--purge is only supported by desetup and uninstall.'
     );
 
     process.exitCode = 2;

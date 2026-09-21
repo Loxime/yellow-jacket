@@ -1,6 +1,9 @@
 import {
+  access,
   chmod,
   mkdir,
+  rm,
+  rmdir,
   writeFile
 } from 'node:fs/promises';
 
@@ -145,7 +148,7 @@ export async function findGitRoot(
 
   if (result.code !== 0) {
     throw new Error(
-      'yellow-jacket install must be run inside a Git repository.'
+      'yellow-jacket Git integration must be run inside a Git repository.'
     );
   }
 
@@ -268,5 +271,140 @@ export async function installGitHook(
     hookPath,
     hooksPath:
       YELLOW_JACKET_HOOKS_PATH
+  };
+}
+
+export interface UninstallGitHookResult {
+  root: string | null;
+  hookPath: string | null;
+  hookRemoved: boolean;
+  hooksPathRemoved: boolean;
+}
+
+export async function uninstallGitHook(
+  cwd = process.cwd()
+): Promise<UninstallGitHookResult> {
+  let root: string;
+
+  try {
+    root =
+      await findGitRoot(
+        cwd
+      );
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes(
+        'must be run inside a Git repository'
+      )
+    ) {
+      return {
+        root: null,
+        hookPath: null,
+        hookRemoved: false,
+        hooksPathRemoved: false
+      };
+    }
+
+    throw error;
+  }
+
+  const hooksDirectory =
+    resolve(
+      root,
+      YELLOW_JACKET_HOOKS_PATH
+    );
+
+  const hookPath =
+    resolve(
+      hooksDirectory,
+      'pre-push'
+    );
+
+  let hookRemoved =
+    false;
+
+  try {
+    await access(
+      hookPath
+    );
+
+    await rm(
+      hookPath,
+      {
+        force: true
+      }
+    );
+
+    hookRemoved =
+      true;
+  } catch (error) {
+    if (
+      (
+        error as NodeJS.ErrnoException
+      ).code !== 'ENOENT'
+    ) {
+      throw error;
+    }
+  }
+
+  try {
+    await rmdir(
+      hooksDirectory
+    );
+  } catch (error) {
+    const code =
+      (
+        error as NodeJS.ErrnoException
+      ).code;
+
+    if (
+      code !== 'ENOENT' &&
+      code !== 'ENOTEMPTY'
+    ) {
+      throw error;
+    }
+  }
+
+  const currentHooksPath =
+    await getGitHooksPath(
+      root
+    );
+
+  let hooksPathRemoved =
+    false;
+
+  if (
+    currentHooksPath ===
+    YELLOW_JACKET_HOOKS_PATH
+  ) {
+    const result =
+      await git(
+        [
+          'config',
+          '--local',
+          '--unset',
+          'core.hooksPath'
+        ],
+        root
+      );
+
+    if (
+      result.code !== 0
+    ) {
+      throw new Error(
+        `Unable to remove Git hooks configuration: ${result.stderr.trim()}`
+      );
+    }
+
+    hooksPathRemoved =
+      true;
+  }
+
+  return {
+    root,
+    hookPath,
+    hookRemoved,
+    hooksPathRemoved
   };
 }

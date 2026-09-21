@@ -25,7 +25,8 @@ import test from 'node:test';
 import {
   YELLOW_JACKET_HOOKS_PATH,
   getGitHooksPath,
-  installGitHook
+  installGitHook,
+  uninstallGitHook
 } from '../src/core/git.js';
 
 function run(
@@ -234,6 +235,115 @@ test(
         repository
       ),
       /will not overwrite another hook manager/
+    );
+
+    assert.equal(
+      await getGitHooksPath(
+        repository
+      ),
+      '.husky/_'
+    );
+  }
+);
+
+test(
+  'uninstalls the Yellow Jacket Git hook',
+  async (t) => {
+    const repository =
+      await createRepository();
+
+    t.after(
+      async () => {
+        await rm(
+          repository,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    const installed =
+      await installGitHook(
+        repository
+      );
+
+    const result =
+      await uninstallGitHook(
+        repository
+      );
+
+    assert.equal(
+      result.hookRemoved,
+      true
+    );
+
+    assert.equal(
+      result.hooksPathRemoved,
+      true
+    );
+
+    assert.equal(
+      await getGitHooksPath(
+        repository
+      ),
+      null
+    );
+
+    await assert.rejects(
+      access(
+        installed.hookPath
+      ),
+      {
+        code:
+          'ENOENT'
+      }
+    );
+  }
+);
+
+test(
+  'uninstall does not remove another Git hook manager',
+  async (t) => {
+    const repository =
+      await createRepository();
+
+    t.after(
+      async () => {
+        await rm(
+          repository,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await installGitHook(
+      repository
+    );
+
+    await run(
+      'git',
+      [
+        'config',
+        '--local',
+        'core.hooksPath',
+        '.husky/_'
+      ],
+      repository
+    );
+
+    const result =
+      await uninstallGitHook(
+        repository
+      );
+
+    assert.equal(
+      result.hooksPathRemoved,
+      false
     );
 
     assert.equal(

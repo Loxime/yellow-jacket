@@ -803,3 +803,97 @@ test(
     );
   }
 );
+
+test(
+  'desetup --purge removes Yellow Jacket project files without requiring a config',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-desetup-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'package.json'
+      ),
+      JSON.stringify({
+        name:
+          'consumer',
+        version:
+          '1.0.0',
+
+        scripts: {
+          'yellow-jacket':
+            'yellow-jacket run',
+
+          'yellow-jacket:baseline':
+            'yellow-jacket baseline'
+        }
+      }),
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      'export default {};\n',
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'desetup',
+          '--purge'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      0
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    assert.match(
+      result.stdout,
+      /yellow-jacket removed from this project/
+    );
+
+    await assert.rejects(
+      readFile(
+        join(
+          directory,
+          'yellow-jacket.config.mjs'
+        ),
+        'utf8'
+      ),
+      {
+        code:
+          'ENOENT'
+      }
+    );
+  }
+);

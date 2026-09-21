@@ -20,8 +20,13 @@ export {
   YELLOW_JACKET_HOOKS_PATH,
   findGitRoot,
   getGitHooksPath,
-  installGitHook
+  installGitHook,
+  uninstallGitHook
 } from './core/git.js';
+
+export {
+  desetupProject
+} from './commands/desetup.js';
 
 export {
   buildCoverageReport,

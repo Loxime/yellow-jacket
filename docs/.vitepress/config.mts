@@ -69,6 +69,12 @@ export default defineConfig({
               'Configuration',
             link:
               '/configuration'
+          },
+          {
+            text:
+              'Desetup / uninstall',
+            link:
+              '/desetup'
           }
         ]
       },
