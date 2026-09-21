@@ -276,3 +276,431 @@ test(
     );
   }
 );
+
+test(
+  'captures configured response headers',
+  async (t) => {
+    const server =
+      createServer(
+        (_request, response) => {
+          response.setHeader(
+            'x-api-version',
+            '2'
+          );
+
+          response.setHeader(
+            'cache-control',
+            'no-store'
+          );
+
+          response.end(
+            'ok'
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => server.close()
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address === 'object'
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            `http://127.0.0.1:${address.port}`,
+
+          compare: {
+            headers: [
+              'X-API-Version',
+              'cache-control'
+            ]
+          }
+        },
+        {
+          path:
+            '/'
+        }
+      );
+
+    assert.deepEqual(
+      result.responseHeaders,
+      {
+        'x-api-version':
+          '2',
+        'cache-control':
+          'no-store'
+      }
+    );
+
+    assert.equal(
+      result.redirected,
+      false
+    );
+
+    assert.match(
+      result.finalUrl ?? '',
+      /127\.0\.0\.1/
+    );
+  }
+);
+
+test(
+  'detects configured response header regressions',
+  () => {
+    const baseline:
+      BaselineFile = {
+        formatVersion: 1,
+        createdAt:
+          new Date(0)
+            .toISOString(),
+        baseUrl:
+          'http://localhost',
+
+        responses: [
+          {
+            route:
+              'users',
+            method:
+              'GET',
+            url:
+              'http://localhost/users',
+            status:
+              200,
+            contentType:
+              'application/json',
+            body: {
+              ok: true
+            },
+            durationMs:
+              10,
+
+            responseHeaders: {
+              'x-api-version':
+                '1'
+            }
+          }
+        ]
+      };
+
+    const regressions =
+      compareWithBaseline(
+        baseline,
+        [
+          {
+            route:
+              'users',
+            method:
+              'GET',
+            url:
+              'http://localhost/users',
+            status:
+              200,
+            contentType:
+              'application/json',
+            body: {
+              ok: true
+            },
+            durationMs:
+              12,
+            passed:
+              true,
+
+            responseHeaders: {
+              'x-api-version':
+                '2'
+            }
+          }
+        ],
+        {
+          headers: [
+            'X-API-Version'
+          ]
+        }
+      );
+
+    assert.deepEqual(
+      regressions[0]?.changes,
+      [
+        'header x-api-version "1" -> "2"'
+      ]
+    );
+  }
+);
+
+test(
+  'follows redirects and records the final URL',
+  async (t) => {
+    const server =
+      createServer(
+        (request, response) => {
+          if (
+            request.url ===
+            '/old'
+          ) {
+            response.statusCode =
+              302;
+
+            response.setHeader(
+              'location',
+              '/new'
+            );
+
+            response.end();
+            return;
+          }
+
+          response.statusCode =
+            200;
+
+          response.end(
+            'new'
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => server.close()
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address === 'object'
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            `http://127.0.0.1:${address.port}`,
+
+          compare: {
+            redirects:
+              true
+          }
+        },
+        {
+          path:
+            '/old'
+        }
+      );
+
+    assert.equal(
+      result.status,
+      200
+    );
+
+    assert.equal(
+      result.redirected,
+      true
+    );
+
+    assert.match(
+      result.finalUrl ?? '',
+      /\/new$/
+    );
+  }
+);
+
+test(
+  'supports manual redirect inspection',
+  async (t) => {
+    const server =
+      createServer(
+        (_request, response) => {
+          response.statusCode =
+            302;
+
+          response.setHeader(
+            'location',
+            '/login'
+          );
+
+          response.end();
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => server.close()
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address === 'object'
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            `http://127.0.0.1:${address.port}`,
+
+          compare: {
+            redirects:
+              true
+          }
+        },
+        {
+          name:
+            'login redirect',
+
+          path:
+            '/private',
+
+          redirect:
+            'manual',
+
+          expect: {
+            status:
+              302
+          }
+        }
+      );
+
+    assert.equal(
+      result.passed,
+      true
+    );
+
+    assert.equal(
+      result.status,
+      302
+    );
+
+    assert.equal(
+      result.redirected,
+      false
+    );
+
+    assert.equal(
+      result
+        .responseHeaders
+        ?.location,
+      '/login'
+    );
+  }
+);
+
+test(
+  'detects redirect destination regressions',
+  () => {
+    const baseline:
+      BaselineFile = {
+        formatVersion:
+          1,
+
+        createdAt:
+          new Date(0)
+            .toISOString(),
+
+        baseUrl:
+          'http://localhost',
+
+        responses: [
+          {
+            route:
+              'legacy',
+            method:
+              'GET',
+            url:
+              'http://localhost/legacy',
+            status:
+              200,
+            contentType:
+              'text/plain',
+            body:
+              'ok',
+            durationMs:
+              10,
+            redirected:
+              true,
+            finalUrl:
+              'http://localhost/v1'
+          }
+        ]
+      };
+
+    const regressions =
+      compareWithBaseline(
+        baseline,
+        [
+          {
+            route:
+              'legacy',
+            method:
+              'GET',
+            url:
+              'http://localhost/legacy',
+            status:
+              200,
+            contentType:
+              'text/plain',
+            body:
+              'ok',
+            durationMs:
+              12,
+            passed:
+              true,
+            redirected:
+              true,
+            finalUrl:
+              'http://localhost/v2'
+          }
+        ],
+        {
+          redirects:
+            true
+        }
+      );
+
+    assert.deepEqual(
+      regressions[0]?.changes,
+      [
+        'final URL http://localhost/v1 -> http://localhost/v2'
+      ]
+    );
+  }
+);

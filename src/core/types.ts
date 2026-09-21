@@ -11,6 +11,11 @@ export type CoverageMethod =
   | HttpMethod
   | 'TRACE';
 
+export type RedirectMode =
+  | 'follow'
+  | 'error'
+  | 'manual';
+
 export interface RouteExpectation {
   status?: number | number[];
 }
@@ -21,6 +26,7 @@ export interface RouteDefinition {
   path: string;
   headers?: Record<string, string>;
   body?: unknown;
+  redirect?: RedirectMode;
   expect?: RouteExpectation;
 }
 
@@ -36,6 +42,8 @@ export interface ScenarioDefinition {
 export interface CompareConfig {
   ignore?: string[];
   redact?: string[];
+  headers?: string[];
+  redirects?: boolean;
 }
 
 export interface CoverageConfig {
@@ -67,6 +75,9 @@ export interface ResponseSnapshot {
   contentType: string | null;
   body: unknown;
   durationMs: number;
+  responseHeaders?: Record<string, string | null>;
+  redirected?: boolean;
+  finalUrl?: string;
 }
 
 export interface RouteRunResult extends ResponseSnapshot {

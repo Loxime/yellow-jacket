@@ -154,6 +154,66 @@ export function isSafeActionTarget(
   );
 }
 
+function comparedResponseHeaderNames(
+  config: YellowJacketConfig
+): string[] {
+  const names =
+    new Set<string>();
+
+  for (
+    const name
+    of config.compare?.headers ?? []
+  ) {
+    const normalized =
+      name
+        .trim()
+        .toLowerCase();
+
+    if (normalized) {
+      names.add(
+        normalized
+      );
+    }
+  }
+
+  if (
+    config.compare?.redirects
+  ) {
+    names.add(
+      'location'
+    );
+  }
+
+  return [
+    ...names
+  ];
+}
+
+function captureResponseHeaders(
+  config: YellowJacketConfig,
+  response: Response
+): Record<string, string | null> {
+  const captured:
+    Record<
+      string,
+      string | null
+    > = {};
+
+  for (
+    const name
+    of comparedResponseHeaderNames(
+      config
+    )
+  ) {
+    captured[name] =
+      response.headers.get(
+        name
+      );
+  }
+
+  return captured;
+}
+
 function durationSince(
   startedAt: number
 ): number {
@@ -275,6 +335,9 @@ export async function runRoute(
       RequestInit = {
         method,
         headers,
+        redirect:
+          route.redirect ??
+          'follow',
         signal:
           AbortSignal.timeout(
             config.timeoutMs ??
@@ -309,6 +372,12 @@ export async function runRoute(
         response.status
       );
 
+    const responseHeaders =
+      captureResponseHeaders(
+        config,
+        response
+      );
+
     return {
       route:
         route.name ??
@@ -327,6 +396,22 @@ export async function runRoute(
         durationSince(
           startedAt
         ),
+
+      ...(Object.keys(
+        responseHeaders
+      ).length > 0
+        ? {
+            responseHeaders
+          }
+        : {}),
+
+      redirected:
+        response.redirected,
+
+      finalUrl:
+        response.url ||
+        url,
+
       passed:
         statusMatches,
 

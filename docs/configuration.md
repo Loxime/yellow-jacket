@@ -43,7 +43,15 @@ export default defineConfig({
     redact: [
       '$.token',
       '$.password'
-    ]
+    ],
+
+    headers: [
+      'cache-control',
+      'x-api-version'
+    ],
+
+    redirects:
+      true
   },
 
   routes: [
@@ -252,6 +260,74 @@ Stored value:
 ```
 
 This prevents newly generated baselines from containing the original secret.
+
+## Compare response headers
+
+Response headers are opt-in because many headers contain dynamic values such as
+dates, request IDs or infrastructure metadata.
+
+Choose the headers that represent stable application behavior:
+
+```js
+compare: {
+  headers: [
+    'cache-control',
+    'etag',
+    'x-api-version'
+  ]
+}
+```
+
+Header names are case-insensitive.
+
+`content-type` is already compared separately and normalized so parameters such
+as `charset=utf-8` do not create false regressions.
+
+## Redirect behavior
+
+Native fetch follows redirects by default.
+
+A route can explicitly choose its redirect behavior:
+
+```js
+{
+  name:
+    'legacy page',
+
+  path:
+    '/old',
+
+  redirect:
+    'manual',
+
+  expect: {
+    status: 302
+  }
+}
+```
+
+Supported modes:
+
+```text
+follow
+manual
+error
+```
+
+To compare redirect behavior against the baseline:
+
+```js
+compare: {
+  redirects:
+    true
+}
+```
+
+With `follow`, Yellow Jacket records whether a redirect happened and the final
+URL.
+
+With `manual`, Yellow Jacket can also compare the redirect status and
+`Location` header directly.
 
 ## Supported JSON paths
 

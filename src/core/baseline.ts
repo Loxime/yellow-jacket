@@ -53,6 +53,71 @@ function normalizeContentType(
   return mediaType || null;
 }
 
+function comparedHeaderNames(
+  compare: CompareConfig | undefined
+): string[] {
+  const names =
+    new Set<string>();
+
+  for (
+    const name
+    of compare?.headers ?? []
+  ) {
+    const normalized =
+      name
+        .trim()
+        .toLowerCase();
+
+    if (
+      normalized &&
+      normalized !==
+        'content-type'
+    ) {
+      names.add(
+        normalized
+      );
+    }
+  }
+
+  if (
+    compare?.redirects
+  ) {
+    names.add(
+      'location'
+    );
+  }
+
+  return [
+    ...names
+  ];
+}
+
+function hasCapturedHeader(
+  snapshot: ResponseSnapshot,
+  name: string
+): boolean {
+  return (
+    snapshot.responseHeaders !==
+      undefined &&
+    Object.prototype
+      .hasOwnProperty
+      .call(
+        snapshot.responseHeaders,
+        name
+      )
+  );
+}
+
+function formatHeaderValue(
+  value: string | null
+): string {
+  return value === null
+    ? 'null'
+    : JSON.stringify(
+        value
+      );
+}
+
 export function baselinePath(
   config: YellowJacketConfig,
   cwd = process.cwd()
@@ -237,6 +302,81 @@ export function compareWithBaseline(
           current.contentType
         )}`
       );
+    }
+
+    for (
+      const name
+      of comparedHeaderNames(
+        compare
+      )
+    ) {
+      if (
+        !hasCapturedHeader(
+          previous,
+          name
+        )
+      ) {
+        continue;
+      }
+
+      const before =
+        previous
+          .responseHeaders
+          ?.[name] ??
+        null;
+
+      const after =
+        current
+          .responseHeaders
+          ?.[name] ??
+        null;
+
+      if (
+        before !==
+        after
+      ) {
+        changes.push(
+          `header ${name} ${formatHeaderValue(
+            before
+          )} -> ${formatHeaderValue(
+            after
+          )}`
+        );
+      }
+    }
+
+    if (
+      compare?.redirects
+    ) {
+      if (
+        previous.redirected !==
+          undefined &&
+        previous.redirected !==
+          current.redirected
+      ) {
+        changes.push(
+          `redirected ${String(
+            previous.redirected
+          )} -> ${String(
+            current.redirected
+          )}`
+        );
+      }
+
+      if (
+        previous.finalUrl !==
+          undefined &&
+        previous.finalUrl !==
+          current.finalUrl
+      ) {
+        changes.push(
+          `final URL ${String(
+            previous.finalUrl
+          )} -> ${String(
+            current.finalUrl
+          )}`
+        );
+      }
     }
 
     if (changes.length > 0) {

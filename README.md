@@ -16,11 +16,11 @@ Current capabilities:
 - secret redaction before snapshot persistence  
 - chained HTTP scenarios  
 - captured response variables  
-- OpenAPI 3.x JSON route coverage  
+- OpenAPI 3.x JSON/YAML route coverage
 - minimum coverage thresholds  
 - JSON coverage output for CI and tooling  
 - Git `pre-push` integration  
-- one focused runtime dependency (`yaml`)  
+- one focused runtime dependency (`yaml`)
 ## Requirements  
 - Node.js 24.12+  
 - Git for hook installation  

@@ -19,6 +19,7 @@ import {
 } from './scenario.js';
 
 import type {
+  RouteDefinition,
   YellowJacketConfig
 } from './types.js';
 
@@ -27,6 +28,26 @@ const CONFIG_FILES = [
   'yellow-jacket.config.mjs',
   'yellow-jacket.config.js'
 ] as const;
+
+function validateRedirect(
+  route: RouteDefinition,
+  source: string
+): void {
+  if (
+    route.redirect !==
+      undefined &&
+    route.redirect !==
+      'follow' &&
+    route.redirect !==
+      'manual' &&
+    route.redirect !==
+      'error'
+  ) {
+    throw new Error(
+      `${source} redirect must be "follow", "manual", or "error".`
+    );
+  }
+}
 
 export function defineConfig(
   config: YellowJacketConfig
@@ -156,6 +177,46 @@ export async function loadConfig(
     );
   }
 
+  if (
+    config.compare?.headers !==
+      undefined &&
+    (
+      !Array.isArray(
+        config.compare.headers
+      ) ||
+      config.compare.headers.some(
+        (name) =>
+          typeof name !== 'string' ||
+          name.trim().length === 0
+      )
+    )
+  ) {
+    throw new Error(
+      `${path} compare.headers must be an array of non-empty strings.`
+    );
+  }
+
+  if (
+    config.compare?.redirects !==
+      undefined &&
+    typeof config.compare.redirects !==
+      'boolean'
+  ) {
+    throw new Error(
+      `${path} compare.redirects must be a boolean.`
+    );
+  }
+
+  for (
+    const route
+    of config.routes ?? []
+  ) {
+    validateRedirect(
+      route,
+      `${path} route ${route.name ?? route.path}`
+    );
+  }
+
   for (
     const comparePath
     of [
@@ -193,6 +254,11 @@ export async function loadConfig(
       const step
       of scenario.steps
     ) {
+      validateRedirect(
+        step,
+        `${path} scenario ${scenario.name} > ${step.name ?? step.path}`
+      );
+
       for (
         const [
           variable,
