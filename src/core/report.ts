@@ -372,3 +372,168 @@ export function formatCoverageHtml(
 </html>
 `;
 }
+
+function escapeGitHubCommandData(
+  value: string
+): string {
+  return value
+    .replace(
+      /%/g,
+      '%25'
+    )
+    .replace(
+      /\r/g,
+      '%0D'
+    )
+    .replace(
+      /\n/g,
+      '%0A'
+    );
+}
+
+export function formatCoverageGitHub(
+  report: CoverageReport
+): string {
+  const lines:
+    string[] = [];
+
+  for (
+    const operation
+    of report.operations
+  ) {
+    if (
+      operation.covered
+    ) {
+      continue;
+    }
+
+    lines.push(
+      `::warning title=Yellow Jacket coverage::${escapeGitHubCommandData(
+        `${operation.method} ${operation.path} is not covered`
+      )}`
+    );
+  }
+
+  const summary =
+    report.minimum ===
+      undefined
+      ? `Coverage ${report.percentage}% (${report.covered}/${report.total}).`
+      : `Coverage ${report.percentage}% (${report.covered}/${report.total}). Minimum ${report.minimum}%.`;
+
+  lines.push(
+    report.passed
+      ? `::notice title=Yellow Jacket coverage::${escapeGitHubCommandData(
+          summary
+        )}`
+      : `::error title=Yellow Jacket coverage::${escapeGitHubCommandData(
+          summary
+        )}`
+  );
+
+  return `${lines.join('\n')}\n`;
+}
+
+function escapeXml(
+  value: string
+): string {
+  return value
+    .replace(
+      /&/g,
+      '&amp;'
+    )
+    .replace(
+      /</g,
+      '&lt;'
+    )
+    .replace(
+      />/g,
+      '&gt;'
+    )
+    .replace(
+      /"/g,
+      '&quot;'
+    )
+    .replace(
+      /'/g,
+      '&apos;'
+    );
+}
+
+export function formatCoverageGitLab(
+  report: CoverageReport
+): string {
+  const tests =
+    report.total + 1;
+
+  const failures =
+    report.passed
+      ? 0
+      : 1;
+
+  const rows =
+    report.operations
+      .map(
+        (operation) => {
+          const name =
+            `${operation.method} ${operation.path}`;
+
+          if (
+            operation.covered
+          ) {
+            return `    <testcase classname="yellow-jacket.coverage" name="${escapeXml(
+              name
+            )}" />`;
+          }
+
+          return [
+            `    <testcase classname="yellow-jacket.coverage" name="${escapeXml(
+              name
+            )}">`,
+            '      <skipped message="Uncovered operation" />',
+            '    </testcase>'
+          ].join('\n');
+        }
+      )
+      .join('\n');
+
+  const gateName =
+    report.minimum ===
+      undefined
+      ? 'coverage summary'
+      : `coverage minimum ${report.minimum}%`;
+
+  const gate =
+    report.passed
+      ? `    <testcase classname="yellow-jacket.coverage" name="${escapeXml(
+          gateName
+        )}" />`
+      : [
+          `    <testcase classname="yellow-jacket.coverage" name="${escapeXml(
+            gateName
+          )}">`,
+          `      <failure message="Coverage requirement not satisfied">${escapeXml(
+            `Coverage ${report.percentage}% is below minimum ${String(
+              report.minimum
+            )}%.`
+          )}</failure>`,
+          '    </testcase>'
+        ].join('\n');
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<testsuite name="Yellow Jacket coverage" tests="${tests}" failures="${failures}" skipped="${report.uncovered}">`,
+    rows,
+    gate,
+    `  <system-out>${escapeXml(
+      `Coverage ${report.percentage}% (${report.covered}/${report.total}). Source: ${report.source}`
+    )}</system-out>`,
+    '</testsuite>',
+    ''
+  ]
+    .filter(
+      (line) =>
+        line.length >
+        0
+    )
+    .join('\n');
+}

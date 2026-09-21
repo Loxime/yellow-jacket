@@ -799,7 +799,7 @@ test(
 
     assert.match(
       result.stderr,
-      /--output requires --json, --markdown or --html/
+      /--output requires --json, --markdown, --html, --github or --gitlab/
     );
   }
 );
@@ -894,6 +894,223 @@ test(
         code:
           'ENOENT'
       }
+    );
+  }
+);
+
+test(
+  'coverage --github emits GitHub Actions annotations and preserves the coverage gate',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-github-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'openapi.json'
+      ),
+      JSON.stringify({
+        openapi:
+          '3.1.0',
+
+        info: {
+          title:
+            'GitHub API',
+          version:
+            '1.0.0'
+        },
+
+        paths: {
+          '/health': {
+            get: {
+              responses: {}
+            }
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  coverage: {
+    openapi: './openapi.json',
+    minimum: 100
+  },
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'coverage',
+          '--github'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    assert.match(
+      result.stdout,
+      /::warning title=Yellow Jacket coverage::GET \/health is not covered/
+    );
+
+    assert.match(
+      result.stdout,
+      /::error title=Yellow Jacket coverage::/
+    );
+  }
+);
+
+test(
+  'coverage --gitlab writes a JUnit report and preserves the coverage gate',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-gitlab-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'openapi.json'
+      ),
+      JSON.stringify({
+        openapi:
+          '3.1.0',
+
+        info: {
+          title:
+            'GitLab API',
+          version:
+            '1.0.0'
+        },
+
+        paths: {
+          '/health': {
+            get: {
+              responses: {}
+            }
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  coverage: {
+    openapi: './openapi.json',
+    minimum: 100
+  },
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'coverage',
+          '--gitlab',
+          '--output',
+          'reports/yellow-jacket-junit.xml'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    const xml =
+      await readFile(
+        join(
+          directory,
+          'reports',
+          'yellow-jacket-junit.xml'
+        ),
+        'utf8'
+      );
+
+    assert.match(
+      xml,
+      /^<\?xml version="1\.0"/
+    );
+
+    assert.match(
+      xml,
+      /Yellow Jacket coverage/
+    );
+
+    assert.match(
+      xml,
+      /Coverage requirement not satisfied/
     );
   }
 );

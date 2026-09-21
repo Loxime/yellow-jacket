@@ -5,20 +5,16 @@ yellow-jacket-coverage:
 
   script:
     - npm ci
-    - |
-      set +e
-
-      npx yellow-jacket coverage --markdown \
-        > yellow-jacket-coverage.md
-
-      status=$?
-
-      cat yellow-jacket-coverage.md
-
-      exit "$status"
+    - npx yellow-jacket coverage --gitlab --output yellow-jacket-junit.xml
 
   artifacts:
     when: always
+
+    reports:
+      junit:
+        - yellow-jacket-junit.xml
+
     paths:
-      - yellow-jacket-coverage.md
+      - yellow-jacket-junit.xml
+
     expire_in: 1 week

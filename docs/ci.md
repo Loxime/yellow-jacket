@@ -79,6 +79,55 @@ examples/ci/gitlab-ci.yml
 The Markdown report can be preserved as a job artifact even when the coverage
 gate fails.
 
+## Native GitHub Actions reporting
+
+Use:
+
+```bash
+yellow-jacket coverage --github
+```
+
+Yellow Jacket emits GitHub Actions workflow annotations.
+
+Uncovered operations are reported as warnings. If the configured coverage
+minimum is not satisfied, the coverage summary is emitted as an error and the
+command exits with code `1`.
+
+When `GITHUB_STEP_SUMMARY` is available, Yellow Jacket also appends its Markdown
+coverage report to the job summary automatically.
+
+This means a GitHub Actions step can be as small as:
+
+```yaml
+- name: Yellow Jacket coverage
+  run: npx yellow-jacket coverage --github
+```
+
+## Native GitLab reporting
+
+Use the GitLab format to generate a JUnit report:
+
+```bash
+yellow-jacket coverage \
+  --gitlab \
+  --output yellow-jacket-junit.xml
+```
+
+Then expose it as a GitLab test report:
+
+```yaml
+artifacts:
+  when: always
+
+  reports:
+    junit:
+      - yellow-jacket-junit.xml
+```
+
+Covered operations are represented as passing test cases. Uncovered operations
+are represented as skipped test cases. The synthetic coverage gate fails only
+when the configured minimum is not satisfied.
+
 ## Static HTML reports
 
 Generate an HTML report:

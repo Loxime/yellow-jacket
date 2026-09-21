@@ -34,6 +34,8 @@ export {
 } from './core/coverage.js';
 
 export {
+  formatCoverageGitHub,
+  formatCoverageGitLab,
   formatCoverageHtml,
   formatCoverageMarkdown
 } from './core/report.js';

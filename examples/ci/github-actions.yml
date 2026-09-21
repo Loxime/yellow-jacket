@@ -27,25 +27,4 @@ jobs:
         run: npm ci
 
       - name: Yellow Jacket coverage
-        shell: bash
-        run: |
-          set +e
-
-          npx yellow-jacket coverage --markdown \
-            > yellow-jacket-coverage.md
-
-          status=$?
-
-          cat yellow-jacket-coverage.md \
-            >> "$GITHUB_STEP_SUMMARY"
-
-          cat yellow-jacket-coverage.md
-
-          exit "$status"
-
-      - name: Upload Yellow Jacket report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: yellow-jacket-coverage
-          path: yellow-jacket-coverage.md
+        run: npx yellow-jacket coverage --github

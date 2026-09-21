@@ -5,6 +5,7 @@ import {
 } from 'node:util';
 
 import {
+  appendFile,
   mkdir,
   writeFile
 } from 'node:fs/promises';
@@ -45,6 +46,8 @@ import {
 } from './core/runner.js';
 
 import {
+  formatCoverageGitHub,
+  formatCoverageGitLab,
   formatCoverageHtml,
   formatCoverageMarkdown
 } from './core/report.js';
@@ -67,6 +70,9 @@ Usage:
   yellow-jacket coverage --json
   yellow-jacket coverage --markdown
   yellow-jacket coverage --html
+  yellow-jacket coverage --github
+  yellow-jacket coverage --gitlab
+  yellow-jacket coverage --gitlab --output yellow-jacket-junit.xml
   yellow-jacket coverage --html --output coverage.html
 
 Commands:
@@ -172,6 +178,12 @@ async function main():
         type: 'boolean'
       },
       html: {
+        type: 'boolean'
+      },
+      github: {
+        type: 'boolean'
+      },
+      gitlab: {
         type: 'boolean'
       },
       output: {
@@ -314,7 +326,9 @@ async function main():
     [
       values.json,
       values.markdown,
-      values.html
+      values.html,
+      values.github,
+      values.gitlab
     ].filter(
       Boolean
     ).length;
@@ -323,7 +337,7 @@ async function main():
     coverageOutputFormats > 1
   ) {
     console.error(
-      '--json, --markdown and --html cannot be used together.'
+      '--json, --markdown, --html, --github and --gitlab cannot be used together.'
     );
 
     process.exitCode = 2;
@@ -367,6 +381,30 @@ async function main():
   }
 
   if (
+    values.github &&
+    command !== 'coverage'
+  ) {
+    console.error(
+      '--github is only supported by the coverage command.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
+  if (
+    values.gitlab &&
+    command !== 'coverage'
+  ) {
+    console.error(
+      '--gitlab is only supported by the coverage command.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
+  if (
     values.output &&
     command !== 'coverage'
   ) {
@@ -383,7 +421,7 @@ async function main():
     coverageOutputFormats === 0
   ) {
     console.error(
-      '--output requires --json, --markdown or --html.'
+      '--output requires --json, --markdown, --html, --github or --gitlab.'
     );
 
     process.exitCode = 2;
@@ -440,7 +478,28 @@ async function main():
             ? formatCoverageHtml(
                 report
               )
-            : undefined;
+            : values.github
+              ? formatCoverageGitHub(
+                  report
+                )
+              : values.gitlab
+                ? formatCoverageGitLab(
+                    report
+                  )
+                : undefined;
+
+    if (
+      values.github &&
+      process.env.GITHUB_STEP_SUMMARY
+    ) {
+      await appendFile(
+        process.env.GITHUB_STEP_SUMMARY,
+        formatCoverageMarkdown(
+          report
+        ),
+        'utf8'
+      );
+    }
 
     if (
       rendered !== undefined
