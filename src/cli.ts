@@ -4,17 +4,20 @@ import { initProject } from './commands/init.js';
 import { loadConfig } from './core/config.js';
 import { compareWithBaseline, readBaseline, writeBaseline } from './core/baseline.js';
 import { runSuite } from './core/runner.js';
+import { installGitHook } from './core/git.js';
 
 function printHelp(): void {
   console.log(`yellow-jacket
 
 Usage:
   yellow-jacket init
+  yellow-jacket install
   yellow-jacket run
   yellow-jacket baseline
 
 Commands:
   init      Create a local yellow-jacket configuration.
+  install   Install the Git pre-push hook.
   run       Execute routes and compare them with the baseline when available.
   baseline  Execute routes and save their current responses as the baseline.
 `);
@@ -48,6 +51,15 @@ async function main(): Promise<void> {
     const created = await initProject();
     console.log('yellow-jacket initialized.');
     if (created.length > 0) console.log(`Created: ${created.join(', ')}`);
+    return;
+  }
+
+  if (command === 'install') {
+    const installed = await installGitHook();
+
+    console.log('yellow-jacket Git hook installed.');
+    console.log(`Hook: ${installed.hookPath}`);
+    console.log(`core.hooksPath: ${installed.hooksPath}`);
     return;
   }
 

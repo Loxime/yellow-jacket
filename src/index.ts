@@ -15,6 +15,13 @@ export {
 } from './core/scenario.js';
 
 export {
+  YELLOW_JACKET_HOOKS_PATH,
+  findGitRoot,
+  getGitHooksPath,
+  installGitHook
+} from './core/git.js';
+
+export {
   baselinePath,
   compareWithBaseline,
   readBaseline,
