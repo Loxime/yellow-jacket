@@ -251,5 +251,26 @@ export function compareWithBaseline(
     }
   }
 
+  for (
+    const [key, previous]
+    of expected
+  ) {
+    if (
+      seen.has(key)
+    ) {
+      continue;
+    }
+
+    regressions.push({
+      route:
+        previous.route,
+      method:
+        previous.method,
+      changes: [
+        'route is missing from current run'
+      ]
+    });
+  }
+
   return regressions;
 }
