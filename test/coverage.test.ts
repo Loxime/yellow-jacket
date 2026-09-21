@@ -981,3 +981,194 @@ test(
     );
   }
 );
+
+test(
+  'loads OpenAPI 3.x YAML and YML documents',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-openapi-yaml-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    const document = `openapi: 3.1.0
+
+info:
+  title: YAML API
+  version: 1.0.0
+
+paths:
+  /users:
+    get:
+      responses: {}
+    post:
+      responses: {}
+
+  /users/{id}:
+    delete:
+      responses: {}
+`;
+
+    for (
+      const filename
+      of [
+        'openapi.yaml',
+        'openapi.yml'
+      ]
+    ) {
+      await writeFile(
+        join(
+          directory,
+          filename
+        ),
+        document,
+        'utf8'
+      );
+
+      const report =
+        await buildCoverageReport(
+          {
+            baseUrl:
+              'http://localhost',
+
+            coverage: {
+              openapi:
+                `./${filename}`
+            },
+
+            routes: [
+              {
+                method:
+                  'GET',
+                path:
+                  '/users'
+              },
+
+              {
+                method:
+                  'DELETE',
+                path:
+                  '/users/{{userId}}'
+              }
+            ]
+          },
+          directory
+        );
+
+      assert.equal(
+        report.total,
+        3
+      );
+
+      assert.equal(
+        report.covered,
+        2
+      );
+
+      assert.equal(
+        report.uncovered,
+        1
+      );
+
+      assert.equal(
+        report.percentage,
+        66.67
+      );
+
+      assert.deepEqual(
+        report.operations.map(
+          (operation) => [
+            operation.method,
+            operation.path,
+            operation.covered
+          ]
+        ),
+        [
+          [
+            'GET',
+            '/users',
+            true
+          ],
+          [
+            'POST',
+            '/users',
+            false
+          ],
+          [
+            'DELETE',
+            '/users/{id}',
+            true
+          ]
+        ]
+      );
+    }
+  }
+);
+
+test(
+  'rejects invalid OpenAPI YAML',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-openapi-invalid-yaml-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'openapi.yaml'
+      ),
+      `openapi: 3.1.0
+paths: [
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      buildCoverageReport(
+        {
+          baseUrl:
+            'http://localhost',
+
+          coverage: {
+            openapi:
+              './openapi.yaml'
+          },
+
+          routes: []
+        },
+        directory
+      ),
+      /OpenAPI file is not valid YAML/
+    );
+  }
+);

@@ -7,15 +7,32 @@ Coverage discovery itself does not execute application requests.
 
 ## OpenAPI
 
-OpenAPI 3.x JSON documents are supported.
+OpenAPI 3.x documents are supported in JSON and YAML.
 
-Configure a document:
+JSON:
 
 ```js
 coverage: {
   openapi:
     './openapi.json'
 }
+```
+
+YAML:
+
+```js
+coverage: {
+  openapi:
+    './openapi.yaml'
+}
+```
+
+Supported extensions:
+
+```text
+.json
+.yaml
+.yml
 ```
 
 Run:

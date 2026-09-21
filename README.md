@@ -20,7 +20,7 @@ Current capabilities:
 - minimum coverage thresholds  
 - JSON coverage output for CI and tooling  
 - Git `pre-push` integration  
-- zero runtime dependencies  
+- one focused runtime dependency (`yaml`)  
 ## Requirements  
 - Node.js 24.12+  
 - Git for hook installation  

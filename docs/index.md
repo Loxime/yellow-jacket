@@ -31,8 +31,8 @@ features:
   - title: CI-friendly reports
     details: Generate text, JSON, Markdown and standalone HTML reports.
 
-  - title: Zero runtime dependencies
-    details: Built on Node.js native APIs with a deliberately small architecture.
+  - title: Small dependency surface
+    details: Built mostly on Node.js native APIs with one focused YAML parser for OpenAPI discovery.
 ---
 
 ## HTTP regression testing for developers

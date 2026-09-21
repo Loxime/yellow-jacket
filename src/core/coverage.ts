@@ -4,8 +4,13 @@ import {
 
 import {
   dirname,
+  extname,
   resolve
 } from 'node:path';
+
+import {
+  parse as parseYaml
+} from 'yaml';
 
 import {
   fileURLToPath
@@ -224,7 +229,7 @@ function parseOpenApiOperations(
 ): DeclaredOperation[] {
   if (!isRecord(document)) {
     throw new Error(
-      'OpenAPI document must contain a JSON object.'
+      'OpenAPI document must contain an object.'
     );
   }
 
@@ -233,7 +238,7 @@ function parseOpenApiOperations(
     !document.openapi.startsWith('3.')
   ) {
     throw new Error(
-      'yellow-jacket coverage currently supports OpenAPI 3.x JSON documents.'
+      'yellow-jacket coverage currently supports OpenAPI 3.x documents.'
     );
   }
 
@@ -278,6 +283,49 @@ function parseOpenApiOperations(
   }
 
   return operations;
+}
+
+function parseOpenApiDocument(
+  content: string,
+  path: string
+): unknown {
+  const extension =
+    extname(
+      path
+    ).toLowerCase();
+
+  if (
+    extension === '.json'
+  ) {
+    try {
+      return JSON.parse(
+        content
+      ) as unknown;
+    } catch {
+      throw new Error(
+        `OpenAPI file is not valid JSON: ${path}`
+      );
+    }
+  }
+
+  if (
+    extension === '.yaml' ||
+    extension === '.yml'
+  ) {
+    try {
+      return parseYaml(
+        content
+      ) as unknown;
+    } catch {
+      throw new Error(
+        `OpenAPI file is not valid YAML: ${path}`
+      );
+    }
+  }
+
+  throw new Error(
+    `Unsupported OpenAPI file extension: ${path}. Use .json, .yaml or .yml.`
+  );
 }
 
 function decodeXmlEntities(
@@ -657,18 +705,11 @@ export async function buildCoverageReport(
         'OpenAPI'
       );
 
-    let document: unknown;
-
-    try {
-      document =
-        JSON.parse(
-          openapi.content
-        ) as unknown;
-    } catch {
-      throw new Error(
-        `OpenAPI file is not valid JSON: ${openapi.path}`
+    const document =
+      parseOpenApiDocument(
+        openapi.content,
+        openapi.path
       );
-    }
 
     for (
       const operation
