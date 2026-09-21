@@ -229,7 +229,7 @@ test(
 );
 
 test(
-  '--json is rejected outside the coverage command',
+  '--json is rejected outside coverage and doctor',
   async (t) => {
     const directory =
       await mkdtemp(
@@ -267,7 +267,7 @@ test(
 
     assert.match(
       result.stderr,
-      /--json is only supported by the coverage command/
+      /--json is only supported by coverage and doctor/
     );
   }
 );
@@ -1264,6 +1264,176 @@ test(
     assert.match(
       xml,
       /Blocked POST request/
+    );
+  }
+);
+
+test(
+  'doctor --json emits a machine-readable successful diagnostic',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-doctor-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'package.json'
+      ),
+      JSON.stringify({
+        name:
+          'consumer',
+
+        packageManager:
+          'npm@11.0.0',
+
+        devDependencies: {
+          'yellow-jacket':
+            '0.1.0'
+        }
+      }),
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'doctor',
+          '--json'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      0
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    const report =
+      JSON.parse(
+        result.stdout
+      ) as {
+        passed: boolean;
+        summary: {
+          error: number;
+        };
+      };
+
+    assert.equal(
+      report.passed,
+      true
+    );
+
+    assert.equal(
+      report.summary.error,
+      0
+    );
+  }
+);
+
+test(
+  'doctor reports a missing config instead of crashing',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-doctor-missing-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    const result =
+      await runCli(
+        [
+          'doctor',
+          '--json'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    const report =
+      JSON.parse(
+        result.stdout
+      ) as {
+        passed: boolean;
+        checks: Array<{
+          id: string;
+          status: string;
+        }>;
+      };
+
+    assert.equal(
+      report.passed,
+      false
+    );
+
+    assert.equal(
+      report.checks.find(
+        (check) =>
+          check.id ===
+          'config'
+      )?.status,
+      'error'
     );
   }
 );

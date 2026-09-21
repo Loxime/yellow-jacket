@@ -118,6 +118,29 @@ export interface RunReport {
   regressions: Regression[];
 }
 
+export type DoctorCheckStatus =
+  | 'pass'
+  | 'warning'
+  | 'error';
+
+export interface DoctorCheck {
+  id: string;
+  status: DoctorCheckStatus;
+  message: string;
+}
+
+export interface DoctorReport {
+  passed: boolean;
+
+  summary: {
+    pass: number;
+    warning: number;
+    error: number;
+  };
+
+  checks: DoctorCheck[];
+}
+
 export interface CoverageOperation {
   method: CoverageMethod;
   path: string;

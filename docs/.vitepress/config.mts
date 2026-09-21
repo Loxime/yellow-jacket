@@ -75,6 +75,12 @@ export default defineConfig({
               'Desetup / uninstall',
             link:
               '/desetup'
+          },
+          {
+            text:
+              'Doctor',
+            link:
+              '/doctor'
           }
         ]
       },

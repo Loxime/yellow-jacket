@@ -29,6 +29,10 @@ export {
 } from './commands/desetup.js';
 
 export {
+  doctorProject
+} from './commands/doctor.js';
+
+export {
   buildCoverageReport,
   normalizeCoveragePath
 } from './core/coverage.js';
@@ -70,6 +74,9 @@ export type {
   CoverageMethod,
   CoverageOperation,
   CoverageReport,
+  DoctorCheck,
+  DoctorCheckStatus,
+  DoctorReport,
   HttpMethod,
   Regression,
   ResponseSnapshot,

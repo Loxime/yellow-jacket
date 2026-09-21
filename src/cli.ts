@@ -24,6 +24,10 @@ import {
 } from './commands/desetup.js';
 
 import {
+  doctorProject
+} from './commands/doctor.js';
+
+import {
   compareWithBaseline,
   readBaseline,
   writeBaseline
@@ -68,6 +72,8 @@ Usage:
   yellow-jacket install
   yellow-jacket desetup [--purge]
   yellow-jacket uninstall [--purge]
+  yellow-jacket doctor
+  yellow-jacket doctor --json
   yellow-jacket run [--allow-actions]
   yellow-jacket run --github
   yellow-jacket run --gitlab --output yellow-jacket-run.xml
@@ -86,6 +92,7 @@ Commands:
   install   Install the Git pre-push hook.
   desetup   Remove Yellow Jacket from the current project.
   uninstall Alias for desetup.
+  doctor    Diagnose the local Yellow Jacket project without making HTTP requests.
   run       Execute routes and compare them with the baseline when available.
   baseline  Execute routes and save their current responses as the baseline.
   coverage  Compare configured requests with coverage route inventories.
@@ -162,6 +169,44 @@ function printCoverage(
         : '✗ Coverage requirement not satisfied'
     );
   }
+}
+
+function printDoctor(
+  report: Awaited<
+    ReturnType<
+      typeof doctorProject
+    >
+  >
+): void {
+  const markers = {
+    pass:
+      '✓',
+    warning:
+      '!',
+    error:
+      '✗'
+  } as const;
+
+  console.log(
+    'yellow-jacket doctor\n'
+  );
+
+  for (
+    const check
+    of report.checks
+  ) {
+    console.log(
+      `${markers[check.status]} ${check.id.padEnd(
+        18
+      )} ${check.message}`
+    );
+  }
+
+  console.log('');
+
+  console.log(
+    `${report.summary.pass} passed, ${report.summary.warning} warning(s), ${report.summary.error} error(s)`
+  );
 }
 
 async function main():
@@ -313,7 +358,8 @@ async function main():
     new Set([
       'run',
       'baseline',
-      'coverage'
+      'coverage',
+      'doctor'
     ]);
 
   if (
@@ -352,10 +398,11 @@ async function main():
 
   if (
     values.json &&
-    command !== 'coverage'
+    command !== 'coverage' &&
+    command !== 'doctor'
   ) {
     console.error(
-      '--json is only supported by the coverage command.'
+      '--json is only supported by coverage and doctor.'
     );
 
     process.exitCode = 2;
@@ -472,6 +519,40 @@ async function main():
     );
 
     process.exitCode = 2;
+    return;
+  }
+
+  if (
+    command === 'doctor'
+  ) {
+    const report =
+      await doctorProject(
+        process.cwd()
+      );
+
+    if (
+      values.json
+    ) {
+      process.stdout.write(
+        `${JSON.stringify(
+          report,
+          null,
+          2
+        )}\n`
+      );
+    } else {
+      printDoctor(
+        report
+      );
+    }
+
+    if (
+      !report.passed
+    ) {
+      process.exitCode =
+        1;
+    }
+
     return;
   }
 
