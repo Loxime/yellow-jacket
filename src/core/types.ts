@@ -40,6 +40,7 @@ export interface CompareConfig {
 
 export interface CoverageConfig {
   openapi?: string;
+  sitemap?: string;
   minimum?: number;
 }
 

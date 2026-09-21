@@ -43,13 +43,14 @@ Usage:
   yellow-jacket run
   yellow-jacket baseline
   yellow-jacket coverage
+  yellow-jacket coverage --json
 
 Commands:
   init      Create a local yellow-jacket configuration.
   install   Install the Git pre-push hook.
   run       Execute routes and compare them with the baseline when available.
   baseline  Execute routes and save their current responses as the baseline.
-  coverage  Compare configured requests with an OpenAPI route inventory.
+  coverage  Compare configured requests with coverage route inventories.
 `);
 }
 
@@ -215,6 +216,18 @@ async function main():
     return;
   }
 
+  if (
+    values.json &&
+    command !== 'coverage'
+  ) {
+    console.error(
+      '--json is only supported by the coverage command.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
   const config =
     await loadConfig();
 
@@ -226,9 +239,23 @@ async function main():
         config
       );
 
-    printCoverage(
-      report
-    );
+    if (values.json) {
+      console.log(
+        JSON.stringify(
+          report,
+          null,
+          2
+        )
+      );
+    } else {
+      printCoverage(
+        report
+      );
+    }
+
+    if (!report.passed) {
+      process.exitCode = 1;
+    }
 
     return;
   }

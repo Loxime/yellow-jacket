@@ -438,3 +438,295 @@ test(
     );
   }
 );
+
+test(
+  'uses sitemap URLs as GET coverage operations',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-sitemap-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'sitemap.xml'
+      ),
+      `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://example.test/</loc>
+  </url>
+  <url>
+    <loc>https://example.test/about/</loc>
+  </url>
+  <url>
+    <loc>https://example.test/products?source=sitemap&amp;page=1</loc>
+  </url>
+</urlset>
+`,
+      'utf8'
+    );
+
+    const report =
+      await buildCoverageReport(
+        {
+          baseUrl:
+            'http://localhost',
+
+          coverage: {
+            sitemap:
+              './sitemap.xml'
+          },
+
+          routes: [
+            {
+              name: 'home',
+              path: '/'
+            },
+            {
+              name: 'about',
+              path: '/about'
+            }
+          ]
+        },
+        directory
+      );
+
+    assert.equal(
+      report.total,
+      3
+    );
+
+    assert.equal(
+      report.covered,
+      2
+    );
+
+    assert.equal(
+      report.percentage,
+      66.67
+    );
+
+    assert.deepEqual(
+      report.operations.map(
+        (operation) => [
+          operation.method,
+          operation.path,
+          operation.covered
+        ]
+      ),
+      [
+        [
+          'GET',
+          '/',
+          true
+        ],
+        [
+          'GET',
+          '/about',
+          true
+        ],
+        [
+          'GET',
+          '/products',
+          false
+        ]
+      ]
+    );
+  }
+);
+
+test(
+  'deduplicates operations declared by both OpenAPI and sitemap',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-combined-coverage-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'openapi.json'
+      ),
+      JSON.stringify({
+        openapi: '3.1.0',
+
+        info: {
+          title: 'Combined API',
+          version: '1.0.0'
+        },
+
+        paths: {
+          '/about': {
+            get: {
+              responses: {}
+            }
+          },
+
+          '/users': {
+            post: {
+              responses: {}
+            }
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'sitemap.xml'
+      ),
+      `<?xml version="1.0"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://example.test/about</loc>
+  </url>
+  <url>
+    <loc>https://example.test/contact</loc>
+  </url>
+</urlset>
+`,
+      'utf8'
+    );
+
+    const report =
+      await buildCoverageReport(
+        {
+          baseUrl:
+            'http://localhost',
+
+          coverage: {
+            openapi:
+              './openapi.json',
+            sitemap:
+              './sitemap.xml'
+          },
+
+          routes: [
+            {
+              path:
+                '/about'
+            },
+            {
+              path:
+                '/contact'
+            },
+            {
+              method:
+                'POST',
+              path:
+                '/users'
+            }
+          ]
+        },
+        directory
+      );
+
+    assert.equal(
+      report.total,
+      3
+    );
+
+    assert.equal(
+      report.covered,
+      3
+    );
+
+    assert.equal(
+      report.percentage,
+      100
+    );
+  }
+);
+
+test(
+  'rejects sitemap indexes until recursive sitemap discovery is supported',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-sitemap-index-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'sitemap.xml'
+      ),
+      `<?xml version="1.0"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://example.test/sitemap-pages.xml</loc>
+  </sitemap>
+</sitemapindex>
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      buildCoverageReport(
+        {
+          baseUrl:
+            'http://localhost',
+
+          coverage: {
+            sitemap:
+              './sitemap.xml'
+          },
+
+          routes: []
+        },
+        directory
+      ),
+      /Sitemap indexes are not supported yet/
+    );
+  }
+);

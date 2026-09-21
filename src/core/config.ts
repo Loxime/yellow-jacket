@@ -134,6 +134,15 @@ export async function loadConfig(
   }
 
   if (
+    config.coverage?.sitemap !== undefined &&
+    typeof config.coverage.sitemap !== 'string'
+  ) {
+    throw new Error(
+      `${path} coverage.sitemap must be a string.`
+    );
+  }
+
+  if (
     config.coverage?.minimum !== undefined &&
     (
       typeof config.coverage.minimum !== 'number' ||

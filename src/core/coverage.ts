@@ -38,6 +38,11 @@ const METHOD_ORDER:
     'TRACE'
   ];
 
+interface DeclaredOperation {
+  method: CoverageMethod;
+  path: string;
+}
+
 function isRecord(
   value: unknown
 ): value is Record<string, unknown> {
@@ -52,10 +57,9 @@ function stripQueryAndHash(
   path: string
 ): string {
   try {
-    const url =
-      new URL(path);
-
-    return url.pathname;
+    return new URL(
+      path
+    ).pathname;
   } catch {
     return (
       path.split(
@@ -78,7 +82,7 @@ export function normalizeCoveragePath(
     path = `/${path}`;
   }
 
-  // yellow-jacket scenario variables:
+  // yellow-jacket variables:
   // /users/{{userId}}
   path = path.replace(
     /\{\{\s*[^{}]+\s*\}\}/g,
@@ -92,7 +96,7 @@ export function normalizeCoveragePath(
     '{}'
   );
 
-  // Express-style parameters:
+  // Express parameters:
   // /users/:id
   path = path.replace(
     /(^|\/):[^/]+(?=\/|$)/g,
@@ -144,14 +148,11 @@ function configuredOperations(
     const method =
       routeMethod(route);
 
-    const key =
+    configured.set(
       operationKey(
         method,
         route.path
-      );
-
-    configured.set(
-      key,
+      ),
       `route: ${route.name ?? route.path}`
     );
   }
@@ -173,9 +174,7 @@ function configuredOperations(
           step.path
         );
 
-      if (
-        !configured.has(key)
-      ) {
+      if (!configured.has(key)) {
         configured.set(
           key,
           `scenario: ${scenario.name} > ${step.name ?? step.path}`
@@ -187,73 +186,10 @@ function configuredOperations(
   return configured;
 }
 
-function parseOpenApiOperations(
-  document: unknown
-): Array<{
-  method: CoverageMethod;
-  path: string;
-}> {
-  if (!isRecord(document)) {
-    throw new Error(
-      'OpenAPI document must contain a JSON object.'
-    );
-  }
-
-  if (
-    typeof document.openapi !==
-      'string' ||
-    !document.openapi.startsWith(
-      '3.'
-    )
-  ) {
-    throw new Error(
-      'yellow-jacket coverage currently supports OpenAPI 3.x JSON documents.'
-    );
-  }
-
-  if (!isRecord(document.paths)) {
-    throw new Error(
-      'OpenAPI document does not contain a valid "paths" object.'
-    );
-  }
-
-  const operations:
-    Array<{
-      method: CoverageMethod;
-      path: string;
-    }> = [];
-
-  for (
-    const [path, pathItem]
-    of Object.entries(
-      document.paths
-    )
-  ) {
-    if (!isRecord(pathItem)) {
-      continue;
-    }
-
-    for (
-      const method
-      of OPENAPI_METHODS
-    ) {
-      const operation =
-        pathItem[method];
-
-      if (!isRecord(operation)) {
-        continue;
-      }
-
-      operations.push({
-        method: (
-          method.toUpperCase()
-        ) as CoverageMethod,
-        path
-      });
-    }
-  }
-
-  operations.sort(
+function sortOperations(
+  operations: DeclaredOperation[]
+): DeclaredOperation[] {
+  return operations.sort(
     (left, right) => {
       const pathComparison =
         left.path.localeCompare(
@@ -276,93 +212,378 @@ function parseOpenApiOperations(
       );
     }
   );
+}
+
+function parseOpenApiOperations(
+  document: unknown
+): DeclaredOperation[] {
+  if (!isRecord(document)) {
+    throw new Error(
+      'OpenAPI document must contain a JSON object.'
+    );
+  }
+
+  if (
+    typeof document.openapi !== 'string' ||
+    !document.openapi.startsWith('3.')
+  ) {
+    throw new Error(
+      'yellow-jacket coverage currently supports OpenAPI 3.x JSON documents.'
+    );
+  }
+
+  if (!isRecord(document.paths)) {
+    throw new Error(
+      'OpenAPI document does not contain a valid "paths" object.'
+    );
+  }
+
+  const operations:
+    DeclaredOperation[] = [];
+
+  for (
+    const [path, pathItem]
+    of Object.entries(
+      document.paths
+    )
+  ) {
+    if (!isRecord(pathItem)) {
+      continue;
+    }
+
+    for (
+      const method
+      of OPENAPI_METHODS
+    ) {
+      if (
+        !isRecord(
+          pathItem[method]
+        )
+      ) {
+        continue;
+      }
+
+      operations.push({
+        method: (
+          method.toUpperCase()
+        ) as CoverageMethod,
+        path
+      });
+    }
+  }
 
   return operations;
+}
+
+function decodeXmlEntities(
+  value: string
+): string {
+  const decodedNumeric =
+    value
+      .replace(
+        /&#x([0-9a-f]+);/gi,
+        (match, code: string) => {
+          const value =
+            Number.parseInt(
+              code,
+              16
+            );
+
+          if (
+            !Number.isFinite(value) ||
+            value < 0 ||
+            value > 0x10ffff
+          ) {
+            return match;
+          }
+
+          return String.fromCodePoint(
+            value
+          );
+        }
+      )
+      .replace(
+        /&#([0-9]+);/g,
+        (match, code: string) => {
+          const value =
+            Number.parseInt(
+              code,
+              10
+            );
+
+          if (
+            !Number.isFinite(value) ||
+            value < 0 ||
+            value > 0x10ffff
+          ) {
+            return match;
+          }
+
+          return String.fromCodePoint(
+            value
+          );
+        }
+      );
+
+  return decodedNumeric
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function unwrapCdata(
+  value: string
+): string {
+  const match =
+    value.match(
+      /^<!\[CDATA\[([\s\S]*)\]\]>$/
+    );
+
+  return (
+    match?.[1] ??
+    value
+  );
+}
+
+function parseSitemapOperations(
+  xml: string
+): DeclaredOperation[] {
+  if (
+    /<(?:[A-Za-z_][\w.-]*:)?sitemapindex\b/i.test(
+      xml
+    )
+  ) {
+    throw new Error(
+      'Sitemap indexes are not supported yet. Configure a sitemap <urlset> file directly.'
+    );
+  }
+
+  if (
+    !/<(?:[A-Za-z_][\w.-]*:)?urlset\b/i.test(
+      xml
+    )
+  ) {
+    throw new Error(
+      'Sitemap file does not contain a valid <urlset>.'
+    );
+  }
+
+  const operations:
+    DeclaredOperation[] = [];
+
+  const pattern =
+    /<(?:[A-Za-z_][\w.-]*:)?loc\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z_][\w.-]*:)?loc\s*>/gi;
+
+  for (
+    const match
+    of xml.matchAll(pattern)
+  ) {
+    const raw =
+      match[1]?.trim();
+
+    if (!raw) {
+      continue;
+    }
+
+    const location =
+      decodeXmlEntities(
+        unwrapCdata(
+          raw
+        ).trim()
+      );
+
+    if (!location) {
+      continue;
+    }
+
+    operations.push({
+      method: 'GET',
+      path:
+        normalizeCoveragePath(
+          location
+        )
+    });
+  }
+
+  return operations;
+}
+
+async function readCoverageFile(
+  configuredPath: string,
+  cwd: string,
+  label: string
+): Promise<{
+  path: string;
+  content: string;
+}> {
+  const path =
+    resolve(
+      cwd,
+      configuredPath
+    );
+
+  try {
+    return {
+      path,
+      content:
+        await readFile(
+          path,
+          'utf8'
+        )
+    };
+  } catch (error) {
+    if (
+      (
+        error as NodeJS.ErrnoException
+      ).code === 'ENOENT'
+    ) {
+      throw new Error(
+        `${label} file not found: ${path}`
+      );
+    }
+
+    throw error;
+  }
 }
 
 export async function buildCoverageReport(
   config: YellowJacketConfig,
   cwd = process.cwd()
 ): Promise<CoverageReport> {
-  const configuredPath =
+  const openapiPath =
     config.coverage?.openapi;
 
-  if (!configuredPath) {
+  const sitemapPath =
+    config.coverage?.sitemap;
+
+  if (
+    !openapiPath &&
+    !sitemapPath
+  ) {
     throw new Error(
       [
-        'No OpenAPI coverage source configured.',
+        'No coverage source configured.',
         '',
-        'Add this to yellow-jacket.config:',
+        'Configure OpenAPI, sitemap, or both:',
         '',
         'coverage: {',
-        "  openapi: './openapi.json'",
+        "  openapi: './openapi.json',",
+        "  sitemap: './sitemap.xml'",
         '}'
       ].join('\n')
     );
   }
 
-  const source =
-    resolve(
-      cwd,
-      configuredPath
-    );
+  const declared =
+    new Map<
+      string,
+      DeclaredOperation
+    >();
 
-  let raw: string;
+  const sources:
+    string[] = [];
 
-  try {
-    raw =
-      await readFile(
-        source,
-        'utf8'
+  if (openapiPath) {
+    const openapi =
+      await readCoverageFile(
+        openapiPath,
+        cwd,
+        'OpenAPI'
       );
-  } catch (error) {
-    const code =
-      (
-        error as NodeJS.ErrnoException
-      ).code;
 
-    if (code === 'ENOENT') {
+    let document: unknown;
+
+    try {
+      document =
+        JSON.parse(
+          openapi.content
+        ) as unknown;
+    } catch {
       throw new Error(
-        `OpenAPI file not found: ${source}`
+        `OpenAPI file is not valid JSON: ${openapi.path}`
       );
     }
 
-    throw error;
-  }
+    for (
+      const operation
+      of parseOpenApiOperations(
+        document
+      )
+    ) {
+      declared.set(
+        operationKey(
+          operation.method,
+          operation.path
+        ),
+        operation
+      );
+    }
 
-  let document: unknown;
-
-  try {
-    document =
-      JSON.parse(raw) as unknown;
-  } catch {
-    throw new Error(
-      `OpenAPI file is not valid JSON: ${source}`
+    sources.push(
+      openapi.path
     );
   }
 
-  const declared =
-    parseOpenApiOperations(
-      document
+  if (sitemapPath) {
+    const sitemap =
+      await readCoverageFile(
+        sitemapPath,
+        cwd,
+        'Sitemap'
+      );
+
+    for (
+      const operation
+      of parseSitemapOperations(
+        sitemap.content
+      )
+    ) {
+      const key =
+        operationKey(
+          operation.method,
+          operation.path
+        );
+
+      if (
+        !declared.has(key)
+      ) {
+        declared.set(
+          key,
+          operation
+        );
+      }
+    }
+
+    sources.push(
+      sitemap.path
     );
+  }
 
   const configured =
     configuredOperations(
       config
     );
 
+  const declaredOperations =
+    sortOperations(
+      [
+        ...declared.values()
+      ]
+    );
+
   const operations:
     CoverageOperation[] =
-      declared.map(
+      declaredOperations.map(
         (operation) => {
-          const key =
-            operationKey(
-              operation.method,
-              operation.path
-            );
-
           const matchedBy =
-            configured.get(key);
+            configured.get(
+              operationKey(
+                operation.method,
+                operation.path
+              )
+            );
 
           return {
             method:
@@ -410,7 +631,8 @@ export async function buildCoverageReport(
     percentage >= minimum;
 
   return {
-    source,
+    source:
+      sources.join(', '),
     total,
     covered,
     uncovered:

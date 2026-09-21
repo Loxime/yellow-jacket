@@ -1,0 +1,272 @@
+import assert from 'node:assert/strict';
+
+import {
+  mkdtemp,
+  rm,
+  writeFile
+} from 'node:fs/promises';
+
+import {
+  tmpdir
+} from 'node:os';
+
+import {
+  dirname,
+  join,
+  resolve
+} from 'node:path';
+
+import {
+  spawn
+} from 'node:child_process';
+
+import test from 'node:test';
+
+import {
+  fileURLToPath
+} from 'node:url';
+
+const CLI_PATH =
+  resolve(
+    dirname(
+      fileURLToPath(
+        import.meta.url
+      )
+    ),
+    '../src/cli.js'
+  );
+
+interface CliResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+}
+
+function runCli(
+  args: string[],
+  cwd: string
+): Promise<CliResult> {
+  return new Promise(
+    (resolvePromise, reject) => {
+      const child =
+        spawn(
+          process.execPath,
+          [
+            CLI_PATH,
+            ...args
+          ],
+          {
+            cwd,
+            stdio: [
+              'ignore',
+              'pipe',
+              'pipe'
+            ]
+          }
+        );
+
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout.setEncoding(
+        'utf8'
+      );
+
+      child.stderr.setEncoding(
+        'utf8'
+      );
+
+      child.stdout.on(
+        'data',
+        (chunk: string) => {
+          stdout += chunk;
+        }
+      );
+
+      child.stderr.on(
+        'data',
+        (chunk: string) => {
+          stderr += chunk;
+        }
+      );
+
+      child.once(
+        'error',
+        reject
+      );
+
+      child.once(
+        'close',
+        (code) => {
+          resolvePromise({
+            code:
+              code ?? 1,
+            stdout,
+            stderr
+          });
+        }
+      );
+    }
+  );
+}
+
+test(
+  'coverage --json emits JSON and fails below the configured minimum',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'openapi.json'
+      ),
+      JSON.stringify({
+        openapi: '3.1.0',
+
+        info: {
+          title: 'CLI API',
+          version: '1.0.0'
+        },
+
+        paths: {
+          '/users': {
+            get: {
+              responses: {}
+            },
+            post: {
+              responses: {}
+            }
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  coverage: {
+    openapi: './openapi.json',
+    minimum: 100
+  },
+  routes: [
+    {
+      method: 'GET',
+      path: '/users'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'coverage',
+          '--json'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    const report =
+      JSON.parse(
+        result.stdout
+      ) as {
+        percentage: number;
+        minimum: number;
+        passed: boolean;
+      };
+
+    assert.equal(
+      report.percentage,
+      50
+    );
+
+    assert.equal(
+      report.minimum,
+      100
+    );
+
+    assert.equal(
+      report.passed,
+      false
+    );
+  }
+);
+
+test(
+  '--json is rejected outside the coverage command',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-json-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    const result =
+      await runCli(
+        [
+          'run',
+          '--json'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      2
+    );
+
+    assert.match(
+      result.stderr,
+      /--json is only supported by the coverage command/
+    );
+  }
+);
