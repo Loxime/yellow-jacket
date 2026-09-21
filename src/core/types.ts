@@ -7,6 +7,10 @@ export type HttpMethod =
   | 'HEAD'
   | 'OPTIONS';
 
+export type CoverageMethod =
+  | HttpMethod
+  | 'TRACE';
+
 export interface RouteExpectation {
   status?: number | number[];
 }
@@ -34,12 +38,17 @@ export interface CompareConfig {
   redact?: string[];
 }
 
+export interface CoverageConfig {
+  openapi?: string;
+}
+
 export interface YellowJacketConfig {
   baseUrl: string;
   timeoutMs?: number;
   headers?: Record<string, string>;
   baselinePath?: string;
   compare?: CompareConfig;
+  coverage?: CoverageConfig;
   routes?: RouteDefinition[];
   scenarios?: ScenarioDefinition[];
 }
@@ -83,4 +92,20 @@ export interface Regression {
   method: HttpMethod;
   changes: string[];
   bodyChanges?: BodyChange[];
+}
+
+export interface CoverageOperation {
+  method: CoverageMethod;
+  path: string;
+  covered: boolean;
+  matchedBy?: string;
+}
+
+export interface CoverageReport {
+  source: string;
+  total: number;
+  covered: number;
+  uncovered: number;
+  percentage: number;
+  operations: CoverageOperation[];
 }

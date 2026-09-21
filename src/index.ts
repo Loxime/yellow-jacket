@@ -22,6 +22,11 @@ export {
 } from './core/git.js';
 
 export {
+  buildCoverageReport,
+  normalizeCoveragePath
+} from './core/coverage.js';
+
+export {
   baselinePath,
   compareWithBaseline,
   readBaseline,
@@ -44,6 +49,10 @@ export type {
   BodyChange,
   BodyChangeKind,
   CompareConfig,
+  CoverageConfig,
+  CoverageMethod,
+  CoverageOperation,
+  CoverageReport,
   HttpMethod,
   Regression,
   ResponseSnapshot,

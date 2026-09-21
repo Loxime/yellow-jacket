@@ -124,6 +124,15 @@ export async function loadConfig(
     );
   }
 
+  if (
+    config.coverage?.openapi !== undefined &&
+    typeof config.coverage.openapi !== 'string'
+  ) {
+    throw new Error(
+      `${path} coverage.openapi must be a string.`
+    );
+  }
+
   for (
     const comparePath
     of [
