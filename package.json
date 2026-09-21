@@ -1,0 +1,48 @@
+{
+  "name": "yellow-jacket",
+  "version": "0.0.0",
+  "description": "Developer-first HTTP regression testing for routes and API workflows.",
+  "type": "module",
+  "bin": {
+    "yellow-jacket": "./dist/src/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/test/**/*.test.js",
+    "prepublishOnly": "npm test"
+  },
+  "engines": {
+    "node": ">=24.12.0"
+  },
+  "keywords": [
+    "http",
+    "regression-testing",
+    "api-testing",
+    "git-hooks",
+    "developer-tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Loxime/yellow-jacket.git"
+  },
+  "homepage": "https://loxime.github.io/yellow-jacket/",
+  "bugs": {
+    "url": "https://github.com/Loxime/yellow-jacket/issues"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.13.6",
+    "typescript": "^5.8.3"
+  }
+}
