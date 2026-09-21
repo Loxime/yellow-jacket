@@ -5,6 +5,16 @@ import {
 } from 'node:util';
 
 import {
+  mkdir,
+  writeFile
+} from 'node:fs/promises';
+
+import {
+  dirname,
+  resolve
+} from 'node:path';
+
+import {
   initProject
 } from './commands/init.js';
 
@@ -51,6 +61,7 @@ Usage:
   yellow-jacket coverage --json
   yellow-jacket coverage --markdown
   yellow-jacket coverage --html
+  yellow-jacket coverage --html --output coverage.html
 
 Commands:
   init      Create a local yellow-jacket configuration.
@@ -154,6 +165,9 @@ async function main():
       },
       html: {
         type: 'boolean'
+      },
+      output: {
+        type: 'string'
       },
       'allow-actions': {
         type: 'boolean'
@@ -289,6 +303,30 @@ async function main():
   }
 
   if (
+    values.output &&
+    command !== 'coverage'
+  ) {
+    console.error(
+      '--output is only supported by the coverage command.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
+  if (
+    values.output &&
+    coverageOutputFormats === 0
+  ) {
+    console.error(
+      '--output requires --json, --markdown or --html.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
+  if (
     values['allow-actions'] &&
     command !== 'run' &&
     command !== 'baseline'
@@ -312,30 +350,56 @@ async function main():
         config
       );
 
-    if (values.json) {
-      console.log(
-        JSON.stringify(
-          report,
-          null,
-          2
-        )
-      );
-    } else if (
-      values.markdown
+    const rendered =
+      values.json
+        ? `${JSON.stringify(
+            report,
+            null,
+            2
+          )}\n`
+        : values.markdown
+          ? formatCoverageMarkdown(
+              report
+            )
+          : values.html
+            ? formatCoverageHtml(
+                report
+              )
+            : undefined;
+
+    if (
+      rendered !== undefined
     ) {
-      process.stdout.write(
-        formatCoverageMarkdown(
-          report
-        )
-      );
-    } else if (
-      values.html
-    ) {
-      process.stdout.write(
-        formatCoverageHtml(
-          report
-        )
-      );
+      if (values.output) {
+        const outputPath =
+          resolve(
+            process.cwd(),
+            values.output
+          );
+
+        await mkdir(
+          dirname(
+            outputPath
+          ),
+          {
+            recursive: true
+          }
+        );
+
+        await writeFile(
+          outputPath,
+          rendered,
+          'utf8'
+        );
+
+        console.log(
+          `Coverage report written to ${outputPath}`
+        );
+      } else {
+        process.stdout.write(
+          rendered
+        );
+      }
     } else {
       printCoverage(
         report

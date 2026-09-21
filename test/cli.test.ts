@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   mkdtemp,
+  readFile,
   rm,
   writeFile
 } from 'node:fs/promises';
@@ -639,6 +640,166 @@ test(
     assert.match(
       result.stderr,
       /--html is only supported by the coverage command/
+    );
+  }
+);
+
+test(
+  'coverage writes an HTML report to --output and preserves the exit code',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-output-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'openapi.json'
+      ),
+      JSON.stringify({
+        openapi:
+          '3.1.0',
+
+        info: {
+          title:
+            'Output API',
+          version:
+            '1.0.0'
+        },
+
+        paths: {
+          '/health': {
+            get: {
+              responses: {}
+            }
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  coverage: {
+    openapi: './openapi.json',
+    minimum: 100
+  },
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'coverage',
+          '--html',
+          '--output',
+          'reports/coverage.html'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    assert.match(
+      result.stdout,
+      /Coverage report written to/
+    );
+
+    const html =
+      await readFile(
+        join(
+          directory,
+          'reports',
+          'coverage.html'
+        ),
+        'utf8'
+      );
+
+    assert.match(
+      html,
+      /^<!doctype html>/
+    );
+
+    assert.match(
+      html,
+      /Coverage requirement not satisfied/
+    );
+  }
+);
+
+test(
+  '--output requires a structured coverage format',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-output-invalid-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    const result =
+      await runCli(
+        [
+          'coverage',
+          '--output',
+          'coverage.txt'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      2
+    );
+
+    assert.match(
+      result.stderr,
+      /--output requires --json, --markdown or --html/
     );
   }
 );
