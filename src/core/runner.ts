@@ -1,11 +1,23 @@
-import { runScenario } from './scenario.js';
+import {
+  runScenario
+} from './scenario.js';
 
 import type {
   HttpMethod,
   RouteDefinition,
   RouteRunResult,
+  RunOptions,
   YellowJacketConfig
 } from './types.js';
+
+const ACTION_METHODS:
+  ReadonlySet<HttpMethod> =
+    new Set([
+      'POST',
+      'PUT',
+      'PATCH',
+      'DELETE'
+    ]);
 
 function expectedStatusMatches(
   route: RouteDefinition,
@@ -32,7 +44,9 @@ function parseBody(
   }
 
   if (
-    contentType?.includes('json')
+    contentType
+      ?.toLowerCase()
+      .includes('json')
   ) {
     try {
       return JSON.parse(
@@ -46,19 +60,159 @@ function parseBody(
   return text;
 }
 
+export function isActionMethod(
+  method: HttpMethod
+): boolean {
+  return ACTION_METHODS.has(
+    method
+  );
+}
+
+function normalizeHostname(
+  hostname: string
+): string {
+  let value =
+    hostname
+      .toLowerCase()
+      .replace(/\.$/, '');
+
+  if (
+    value.startsWith('[') &&
+    value.endsWith(']')
+  ) {
+    value =
+      value.slice(
+        1,
+        -1
+      );
+  }
+
+  return value;
+}
+
+function isLoopbackIpv4(
+  hostname: string
+): boolean {
+  const parts =
+    hostname.split('.');
+
+  if (
+    parts.length !== 4 ||
+    parts[0] !== '127'
+  ) {
+    return false;
+  }
+
+  return parts.every(
+    (part) => {
+      if (
+        !/^\d{1,3}$/.test(
+          part
+        )
+      ) {
+        return false;
+      }
+
+      const value =
+        Number(part);
+
+      return (
+        value >= 0 &&
+        value <= 255
+      );
+    }
+  );
+}
+
+export function isSafeActionTarget(
+  input: string | URL
+): boolean {
+  const url =
+    input instanceof URL
+      ? input
+      : new URL(input);
+
+  const hostname =
+    normalizeHostname(
+      url.hostname
+    );
+
+  return (
+    hostname === 'localhost' ||
+    hostname.endsWith(
+      '.localhost'
+    ) ||
+    hostname.endsWith(
+      '.local'
+    ) ||
+    isLoopbackIpv4(
+      hostname
+    ) ||
+    hostname === '::1' ||
+    hostname ===
+      '0:0:0:0:0:0:0:1'
+  );
+}
+
+function durationSince(
+  startedAt: number
+): number {
+  return (
+    Math.round(
+      (
+        performance.now() -
+        startedAt
+      ) * 100
+    ) / 100
+  );
+}
+
 export async function runRoute(
   config: YellowJacketConfig,
-  route: RouteDefinition
+  route: RouteDefinition,
+  options: RunOptions = {}
 ): Promise<RouteRunResult> {
   const method:
     HttpMethod =
       route.method ?? 'GET';
 
-  const url =
+  const target =
     new URL(
       route.path,
       config.baseUrl
-    ).toString();
+    );
+
+  const url =
+    target.toString();
+
+  const startedAt =
+    performance.now();
+
+  if (
+    isActionMethod(method) &&
+    !options.allowActions &&
+    !isSafeActionTarget(
+      target
+    )
+  ) {
+    return {
+      route:
+        route.name ??
+        route.path,
+      method,
+      url,
+      status: 0,
+      contentType: null,
+      body: null,
+      durationMs:
+        durationSince(
+          startedAt
+        ),
+      passed: false,
+      error:
+        `Blocked ${method} request to ${target.host}. Mutating requests are allowed only for local targets by default. Re-run with --allow-actions to override.`
+    };
+  }
 
   const headers =
     new Headers(
@@ -84,11 +238,14 @@ export async function runRoute(
     route.body !== undefined
   ) {
     if (
-      typeof route.body === 'string'
+      typeof route.body ===
+        'string'
     ) {
-      body = route.body;
+      body =
+        route.body;
     } else if (
-      route.body instanceof Uint8Array
+      route.body instanceof
+        Uint8Array
     ) {
       body =
         new Uint8Array(
@@ -112,9 +269,6 @@ export async function runRoute(
       }
     }
   }
-
-  const startedAt =
-    performance.now();
 
   try {
     const requestInit:
@@ -170,12 +324,9 @@ export async function runRoute(
           contentType
         ),
       durationMs:
-        Math.round(
-          (
-            performance.now() -
-            startedAt
-          ) * 100
-        ) / 100,
+        durationSince(
+          startedAt
+        ),
       passed:
         statusMatches,
 
@@ -189,11 +340,6 @@ export async function runRoute(
           })
     };
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : String(error);
-
     return {
       route:
         route.name ??
@@ -204,20 +350,21 @@ export async function runRoute(
       contentType: null,
       body: null,
       durationMs:
-        Math.round(
-          (
-            performance.now() -
-            startedAt
-          ) * 100
-        ) / 100,
+        durationSince(
+          startedAt
+        ),
       passed: false,
-      error: message
+      error:
+        error instanceof Error
+          ? error.message
+          : String(error)
     };
   }
 }
 
 export async function runSuite(
-  config: YellowJacketConfig
+  config: YellowJacketConfig,
+  options: RunOptions = {}
 ): Promise<RouteRunResult[]> {
   const results:
     RouteRunResult[] = [];
@@ -229,7 +376,8 @@ export async function runSuite(
     results.push(
       await runRoute(
         config,
-        route
+        route,
+        options
       )
     );
   }
@@ -242,7 +390,15 @@ export async function runSuite(
       ...await runScenario(
         config,
         scenario,
-        runRoute
+        (
+          scenarioConfig,
+          route
+        ) =>
+          runRoute(
+            scenarioConfig,
+            route,
+            options
+          )
       )
     );
   }

@@ -55,6 +55,10 @@ export interface YellowJacketConfig {
   scenarios?: ScenarioDefinition[];
 }
 
+export interface RunOptions {
+  allowActions?: boolean;
+}
+
 export interface ResponseSnapshot {
   route: string;
   method: HttpMethod;

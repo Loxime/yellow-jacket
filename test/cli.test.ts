@@ -270,3 +270,70 @@ test(
     );
   }
 );
+
+test(
+  'run blocks non-local mutating requests by default',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-actions-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'https://api.example.test',
+  routes: [
+    {
+      name: 'create user',
+      method: 'POST',
+      path: '/users'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'run'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.match(
+      result.stdout,
+      /Blocked POST request/
+    );
+
+    assert.match(
+      result.stdout,
+      /--allow-actions/
+    );
+  }
+);

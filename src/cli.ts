@@ -40,8 +40,8 @@ function printHelp(): void {
 Usage:
   yellow-jacket init
   yellow-jacket install
-  yellow-jacket run
-  yellow-jacket baseline
+  yellow-jacket run [--allow-actions]
+  yellow-jacket baseline [--allow-actions]
   yellow-jacket coverage
   yellow-jacket coverage --json
 
@@ -141,6 +141,9 @@ async function main():
       },
       json: {
         type: 'boolean'
+      },
+      'allow-actions': {
+        type: 'boolean'
       }
     }
   });
@@ -228,6 +231,19 @@ async function main():
     return;
   }
 
+  if (
+    values['allow-actions'] &&
+    command !== 'run' &&
+    command !== 'baseline'
+  ) {
+    console.error(
+      '--allow-actions is only supported by run and baseline.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
   const config =
     await loadConfig();
 
@@ -262,7 +278,12 @@ async function main():
 
   const results =
     await runSuite(
-      config
+      config,
+      {
+        allowActions:
+          values['allow-actions'] ??
+          false
+      }
     );
 
   printResults(

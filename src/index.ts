@@ -5,6 +5,8 @@ export {
 } from './core/config.js';
 
 export {
+  isActionMethod,
+  isSafeActionTarget,
   runRoute,
   runSuite
 } from './core/runner.js';
@@ -59,6 +61,7 @@ export type {
   RouteDefinition,
   RouteExpectation,
   RouteRunResult,
+  RunOptions,
   ScenarioDefinition,
   ScenarioStep,
   YellowJacketConfig
