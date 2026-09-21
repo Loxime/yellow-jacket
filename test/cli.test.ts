@@ -1437,3 +1437,193 @@ test(
     );
   }
 );
+
+test(
+  'run selects a configured route by name',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-route-selection-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'https://api.example.test',
+  routes: [
+    {
+      name: 'create user',
+      method: 'POST',
+      path: '/users'
+    },
+    {
+      name: 'delete user',
+      method: 'DELETE',
+      path: '/users/1'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'run',
+          '--route',
+          'create user'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.match(
+      result.stdout,
+      /create user/
+    );
+
+    assert.equal(
+      result.stdout.includes(
+        'delete user'
+      ),
+      false
+    );
+  }
+);
+
+test(
+  'run fails clearly when selection matches nothing',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-empty-selection-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  routes: [
+    {
+      name: 'health',
+      path: '/health'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'run',
+          '--tag',
+          'missing'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      2
+    );
+
+    assert.match(
+      result.stderr,
+      /No configured routes or scenarios matched/
+    );
+  }
+);
+
+test(
+  'baseline rejects partial run selectors',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-baseline-selection-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    const result =
+      await runCli(
+        [
+          'baseline',
+          '--route',
+          'health'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      2
+    );
+
+    assert.match(
+      result.stderr,
+      /only supported by the run command/
+    );
+  }
+);

@@ -49,6 +49,35 @@ function validateRedirect(
   }
 }
 
+function validateTags(
+  tags: string[] | undefined,
+  source: string
+): void {
+  if (
+    tags ===
+    undefined
+  ) {
+    return;
+  }
+
+  if (
+    !Array.isArray(
+      tags
+    ) ||
+    tags.some(
+      (tag) =>
+        typeof tag !==
+          'string' ||
+        tag.trim().length ===
+          0
+    )
+  ) {
+    throw new Error(
+      `${source} tags must be an array of non-empty strings.`
+    );
+  }
+}
+
 export function defineConfig(
   config: YellowJacketConfig
 ): YellowJacketConfig {
@@ -215,6 +244,11 @@ export async function loadConfig(
       route,
       `${path} route ${route.name ?? route.path}`
     );
+
+    validateTags(
+      route.tags,
+      `${path} route ${route.name ?? route.path}`
+    );
   }
 
   for (
@@ -249,6 +283,11 @@ export async function loadConfig(
         `${path} contains an invalid scenario.`
       );
     }
+
+    validateTags(
+      scenario.tags,
+      `${path} scenario ${scenario.name}`
+    );
 
     for (
       const step

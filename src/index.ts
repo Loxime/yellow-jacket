@@ -38,6 +38,13 @@ export {
 } from './core/coverage.js';
 
 export {
+  countRunTargets,
+  filterBaselineForRun,
+  hasRunSelection,
+  selectRunConfig
+} from './core/selection.js';
+
+export {
   formatCoverageGitHub,
   formatCoverageGitLab,
   formatCoverageHtml,
@@ -85,6 +92,7 @@ export type {
   RouteRunResult,
   RunOptions,
   RunReport,
+  RunSelection,
   ScenarioDefinition,
   ScenarioStep,
   YellowJacketConfig

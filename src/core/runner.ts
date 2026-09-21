@@ -2,6 +2,10 @@ import {
   runScenario
 } from './scenario.js';
 
+import {
+  selectRunConfig
+} from './selection.js';
+
 import type {
   HttpMethod,
   RouteDefinition,
@@ -454,13 +458,19 @@ export async function runSuite(
   const results:
     RouteRunResult[] = [];
 
+  const selectedConfig =
+    selectRunConfig(
+      config,
+      options.selection
+    );
+
   for (
     const route
-    of config.routes ?? []
+    of selectedConfig.routes ?? []
   ) {
     results.push(
       await runRoute(
-        config,
+        selectedConfig,
         route,
         options
       )
@@ -469,11 +479,11 @@ export async function runSuite(
 
   for (
     const scenario
-    of config.scenarios ?? []
+    of selectedConfig.scenarios ?? []
   ) {
     results.push(
       ...await runScenario(
-        config,
+        selectedConfig,
         scenario,
         (
           scenarioConfig,

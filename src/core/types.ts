@@ -22,6 +22,7 @@ export interface RouteExpectation {
 
 export interface RouteDefinition {
   name?: string;
+  tags?: string[];
   method?: HttpMethod;
   path: string;
   headers?: Record<string, string>;
@@ -30,12 +31,17 @@ export interface RouteDefinition {
   expect?: RouteExpectation;
 }
 
-export interface ScenarioStep extends RouteDefinition {
+export interface ScenarioStep
+  extends Omit<
+    RouteDefinition,
+    'tags'
+  > {
   capture?: Record<string, string>;
 }
 
 export interface ScenarioDefinition {
   name: string;
+  tags?: string[];
   steps: ScenarioStep[];
 }
 
@@ -63,8 +69,15 @@ export interface YellowJacketConfig {
   scenarios?: ScenarioDefinition[];
 }
 
+export interface RunSelection {
+  routes?: string[];
+  scenarios?: string[];
+  tags?: string[];
+}
+
 export interface RunOptions {
   allowActions?: boolean;
+  selection?: RunSelection;
 }
 
 export interface ResponseSnapshot {

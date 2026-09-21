@@ -50,6 +50,13 @@ import {
 } from './core/runner.js';
 
 import {
+  countRunTargets,
+  filterBaselineForRun,
+  hasRunSelection,
+  selectRunConfig
+} from './core/selection.js';
+
+import {
   formatCoverageGitHub,
   formatCoverageGitLab,
   formatCoverageHtml,
@@ -61,7 +68,8 @@ import {
 
 import type {
   CoverageReport,
-  RunReport
+  RunReport,
+  RunSelection
 } from './core/types.js';
 
 function printHelp(): void {
@@ -239,6 +247,18 @@ async function main():
       },
       output: {
         type: 'string'
+      },
+      route: {
+        type: 'string',
+        multiple: true
+      },
+      scenario: {
+        type: 'string',
+        multiple: true
+      },
+      tag: {
+        type: 'string',
+        multiple: true
       },
       'allow-actions': {
         type: 'boolean'
@@ -498,6 +518,46 @@ async function main():
     return;
   }
 
+  const selection:
+    RunSelection = {
+      ...(values.route
+        ? {
+            routes:
+              values.route
+          }
+        : {}),
+
+      ...(values.scenario
+        ? {
+            scenarios:
+              values.scenario
+          }
+        : {}),
+
+      ...(values.tag
+        ? {
+            tags:
+              values.tag
+          }
+        : {})
+    };
+
+  if (
+    hasRunSelection(
+      selection
+    ) &&
+    command !==
+      'run'
+  ) {
+    console.error(
+      '--route, --scenario and --tag are only supported by the run command.'
+    );
+
+    process.exitCode =
+      2;
+    return;
+  }
+
   if (
     values.purge
   ) {
@@ -651,9 +711,38 @@ async function main():
     return;
   }
 
+  const selectedConfig =
+    command ===
+      'run'
+      ? selectRunConfig(
+          config,
+          selection
+        )
+      : config;
+
+  if (
+    command ===
+      'run' &&
+    hasRunSelection(
+      selection
+    ) &&
+    countRunTargets(
+      selectedConfig
+    ) ===
+      0
+  ) {
+    console.error(
+      'No configured routes or scenarios matched the requested selection.'
+    );
+
+    process.exitCode =
+      2;
+    return;
+  }
+
   const results =
     await runSuite(
-      config,
+      selectedConfig,
       {
         allowActions:
           values['allow-actions'] ??
@@ -718,7 +807,14 @@ async function main():
   const regressions =
     baseline
       ? compareWithBaseline(
-          baseline,
+          hasRunSelection(
+            selection
+          )
+            ? filterBaselineForRun(
+                baseline,
+                selectedConfig
+              )
+            : baseline,
           results,
           config.compare
         )

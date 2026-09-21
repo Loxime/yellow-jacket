@@ -98,6 +98,12 @@ export default defineConfig({
           },
           {
             text:
+              'Test selection',
+            link:
+              '/selection'
+          },
+          {
+            text:
               'Coverage',
             link:
               '/coverage'
