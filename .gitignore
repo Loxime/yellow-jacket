@@ -6,3 +6,5 @@ coverage/
 .env.*
 !.env.example
 .yellow-jacket/runs/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
