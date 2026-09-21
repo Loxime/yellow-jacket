@@ -337,3 +337,156 @@ test(
     );
   }
 );
+
+test(
+  'coverage --markdown emits a Markdown report',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-markdown-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'openapi.json'
+      ),
+      JSON.stringify({
+        openapi:
+          '3.1.0',
+
+        info: {
+          title:
+            'Markdown API',
+          version:
+            '1.0.0'
+        },
+
+        paths: {
+          '/health': {
+            get: {
+              responses: {}
+            }
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  coverage: {
+    openapi: './openapi.json',
+    minimum: 100
+  },
+  routes: [
+    {
+      name: 'health',
+      path: '/health'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'coverage',
+          '--markdown'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      0
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    assert.match(
+      result.stdout,
+      /## 🐝 Yellow Jacket coverage/
+    );
+
+    assert.match(
+      result.stdout,
+      /\*\*Coverage:\*\* 100% \(1\/1\)/
+    );
+
+    assert.match(
+      result.stdout,
+      /\| GET \| \/health \| ✅ Covered/
+    );
+  }
+);
+
+test(
+  'coverage rejects multiple output formats',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-formats-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    const result =
+      await runCli(
+        [
+          'coverage',
+          '--json',
+          '--markdown'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      2
+    );
+
+    assert.match(
+      result.stderr,
+      /cannot be used together/
+    );
+  }
+);

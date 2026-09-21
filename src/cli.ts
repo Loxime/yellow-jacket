@@ -30,6 +30,10 @@ import {
   runSuite
 } from './core/runner.js';
 
+import {
+  formatCoverageMarkdown
+} from './core/report.js';
+
 import type {
   CoverageReport
 } from './core/types.js';
@@ -44,6 +48,7 @@ Usage:
   yellow-jacket baseline [--allow-actions]
   yellow-jacket coverage
   yellow-jacket coverage --json
+  yellow-jacket coverage --markdown
 
 Commands:
   init      Create a local yellow-jacket configuration.
@@ -142,6 +147,9 @@ async function main():
       json: {
         type: 'boolean'
       },
+      markdown: {
+        type: 'boolean'
+      },
       'allow-actions': {
         type: 'boolean'
       }
@@ -221,10 +229,34 @@ async function main():
 
   if (
     values.json &&
+    values.markdown
+  ) {
+    console.error(
+      '--json and --markdown cannot be used together.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
+  if (
+    values.json &&
     command !== 'coverage'
   ) {
     console.error(
       '--json is only supported by the coverage command.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
+  if (
+    values.markdown &&
+    command !== 'coverage'
+  ) {
+    console.error(
+      '--markdown is only supported by the coverage command.'
     );
 
     process.exitCode = 2;
@@ -261,6 +293,14 @@ async function main():
           report,
           null,
           2
+        )
+      );
+    } else if (
+      values.markdown
+    ) {
+      process.stdout.write(
+        formatCoverageMarkdown(
+          report
         )
       );
     } else {

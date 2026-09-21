@@ -29,6 +29,10 @@ export {
 } from './core/coverage.js';
 
 export {
+  formatCoverageMarkdown
+} from './core/report.js';
+
+export {
   baselinePath,
   compareWithBaseline,
   readBaseline,
