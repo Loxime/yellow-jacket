@@ -34,6 +34,25 @@ function normalizeSnapshot(
   };
 }
 
+function normalizeContentType(
+  value: string | null
+): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const mediaType =
+    value
+      .split(
+        ';',
+        1
+      )[0]
+      ?.trim()
+      .toLowerCase();
+
+  return mediaType || null;
+}
+
 export function baselinePath(
   config: YellowJacketConfig,
   cwd = process.cwd()
@@ -142,6 +161,9 @@ export function compareWithBaseline(
 
   const regressions: Regression[] = [];
 
+  const seen =
+    new Set<string>();
+
   for (const currentRaw of results) {
     const current =
       normalizeSnapshot(
@@ -151,6 +173,10 @@ export function compareWithBaseline(
 
     const key =
       `${current.method} ${current.route}`;
+
+    seen.add(
+      key
+    );
 
     const previousRaw =
       expected.get(key);
@@ -197,8 +223,12 @@ export function compareWithBaseline(
     }
 
     if (
-      previous.contentType !==
-      current.contentType
+      normalizeContentType(
+        previous.contentType
+      ) !==
+      normalizeContentType(
+        current.contentType
+      )
     ) {
       changes.push(
         `content-type ${String(

@@ -482,3 +482,238 @@ test(
     );
   }
 );
+
+test(
+  'reports routes missing from the current run',
+  () => {
+    const baseline:
+      BaselineFile = {
+        formatVersion: 1,
+        createdAt:
+          new Date(0)
+            .toISOString(),
+        baseUrl:
+          'http://localhost',
+
+        responses: [
+          {
+            route:
+              'users',
+            method:
+              'GET',
+            url:
+              'http://localhost/users',
+            status: 200,
+            contentType:
+              'application/json',
+            body: {
+              users: []
+            },
+            durationMs: 1
+          },
+
+          {
+            route:
+              'health',
+            method:
+              'GET',
+            url:
+              'http://localhost/health',
+            status: 200,
+            contentType:
+              'application/json',
+            body: {
+              ok: true
+            },
+            durationMs: 1
+          }
+        ]
+      };
+
+    const regressions =
+      compareWithBaseline(
+        baseline,
+        [
+          {
+            route:
+              'users',
+            method:
+              'GET',
+            url:
+              'http://localhost/users',
+            status: 200,
+            contentType:
+              'application/json',
+            body: {
+              users: []
+            },
+            durationMs: 1,
+            passed: true
+          }
+        ]
+      );
+
+    assert.deepEqual(
+      regressions,
+      [
+        {
+          route:
+            'health',
+          method:
+            'GET',
+          changes: [
+            'route is missing from current run'
+          ]
+        }
+      ]
+    );
+  }
+);
+
+test(
+  'ignores equivalent content-type parameters',
+  () => {
+    const baseline:
+      BaselineFile = {
+        formatVersion: 1,
+        createdAt:
+          new Date(0)
+            .toISOString(),
+        baseUrl:
+          'http://localhost',
+
+        responses: [
+          {
+            route:
+              'users',
+            method:
+              'GET',
+            url:
+              'http://localhost/users',
+            status: 200,
+            contentType:
+              'application/json',
+            body: {
+              users: []
+            },
+            durationMs: 1
+          }
+        ]
+      };
+
+    const regressions =
+      compareWithBaseline(
+        baseline,
+        [
+          {
+            route:
+              'users',
+            method:
+              'GET',
+            url:
+              'http://localhost/users',
+            status: 200,
+            contentType:
+              'Application/JSON; charset=utf-8',
+            body: {
+              users: []
+            },
+            durationMs: 1,
+            passed: true
+          }
+        ]
+      );
+
+    assert.deepEqual(
+      regressions,
+      []
+    );
+  }
+);
+
+test(
+  'reports an ignored field when it disappears',
+  () => {
+    const baseline:
+      BaselineFile = {
+        formatVersion: 1,
+        createdAt:
+          new Date(0)
+            .toISOString(),
+        baseUrl:
+          'http://localhost',
+
+        responses: [
+          {
+            route:
+              'user',
+            method:
+              'GET',
+            url:
+              'http://localhost/user',
+            status: 200,
+            contentType:
+              'application/json',
+
+            body: {
+              id: 42,
+              createdAt:
+                'old-value'
+            },
+
+            durationMs: 1
+          }
+        ]
+      };
+
+    const regressions =
+      compareWithBaseline(
+        baseline,
+        [
+          {
+            route:
+              'user',
+            method:
+              'GET',
+            url:
+              'http://localhost/user',
+            status: 200,
+            contentType:
+              'application/json',
+
+            body: {
+              id: 42
+            },
+
+            durationMs: 1,
+            passed: true
+          }
+        ],
+        {
+          ignore: [
+            '$.createdAt'
+          ]
+        }
+      );
+
+    assert.equal(
+      regressions.length,
+      1
+    );
+
+    assert.deepEqual(
+      regressions[0]
+        ?.bodyChanges,
+      [
+        {
+          path:
+            '$.createdAt',
+          kind:
+            'removed',
+          before:
+            IGNORED_VALUE
+        }
+      ]
+    );
+  }
+);
