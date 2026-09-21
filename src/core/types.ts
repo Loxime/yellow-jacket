@@ -40,6 +40,7 @@ export interface CompareConfig {
 
 export interface CoverageConfig {
   openapi?: string;
+  minimum?: number;
 }
 
 export interface YellowJacketConfig {
@@ -107,5 +108,7 @@ export interface CoverageReport {
   covered: number;
   uncovered: number;
   percentage: number;
+  minimum?: number;
+  passed: boolean;
   operations: CoverageOperation[];
 }

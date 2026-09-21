@@ -402,6 +402,13 @@ export async function buildCoverageReport(
             10_000
         ) / 100;
 
+  const minimum =
+    config.coverage?.minimum;
+
+  const passed =
+    minimum === undefined ||
+    percentage >= minimum;
+
   return {
     source,
     total,
@@ -409,6 +416,14 @@ export async function buildCoverageReport(
     uncovered:
       total - covered,
     percentage,
+
+    ...(minimum !== undefined
+      ? {
+          minimum
+        }
+      : {}),
+
+    passed,
     operations
   };
 }

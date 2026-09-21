@@ -109,6 +109,20 @@ function printCoverage(
   console.log(
     `Coverage: ${report.percentage}%`
   );
+
+  if (
+    report.minimum !== undefined
+  ) {
+    console.log(
+      `Minimum: ${report.minimum}%`
+    );
+
+    console.log(
+      report.passed
+        ? '✓ Coverage requirement satisfied'
+        : '✗ Coverage requirement not satisfied'
+    );
+  }
 }
 
 async function main():
@@ -123,6 +137,9 @@ async function main():
       help: {
         type: 'boolean',
         short: 'h'
+      },
+      json: {
+        type: 'boolean'
       }
     }
   });

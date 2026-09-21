@@ -322,3 +322,119 @@ test(
     );
   }
 );
+
+test(
+  'applies the configured minimum coverage requirement',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-coverage-minimum-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'openapi.json'
+      ),
+      JSON.stringify({
+        openapi: '3.1.0',
+
+        info: {
+          title: 'Threshold API',
+          version: '1.0.0'
+        },
+
+        paths: {
+          '/users': {
+            get: {
+              responses: {}
+            },
+            post: {
+              responses: {}
+            }
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    const failing =
+      await buildCoverageReport(
+        {
+          baseUrl:
+            'http://localhost',
+
+          coverage: {
+            openapi:
+              './openapi.json',
+            minimum: 80
+          },
+
+          routes: [
+            {
+              method: 'GET',
+              path: '/users'
+            }
+          ]
+        },
+        directory
+      );
+
+    assert.equal(
+      failing.percentage,
+      50
+    );
+
+    assert.equal(
+      failing.minimum,
+      80
+    );
+
+    assert.equal(
+      failing.passed,
+      false
+    );
+
+    const passing =
+      await buildCoverageReport(
+        {
+          baseUrl:
+            'http://localhost',
+
+          coverage: {
+            openapi:
+              './openapi.json',
+            minimum: 50
+          },
+
+          routes: [
+            {
+              method: 'GET',
+              path: '/users'
+            }
+          ]
+        },
+        directory
+      );
+
+    assert.equal(
+      passing.passed,
+      true
+    );
+  }
+);

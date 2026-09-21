@@ -133,6 +133,20 @@ export async function loadConfig(
     );
   }
 
+  if (
+    config.coverage?.minimum !== undefined &&
+    (
+      typeof config.coverage.minimum !== 'number' ||
+      !Number.isFinite(config.coverage.minimum) ||
+      config.coverage.minimum < 0 ||
+      config.coverage.minimum > 100
+    )
+  ) {
+    throw new Error(
+      `${path} coverage.minimum must be a number between 0 and 100.`
+    );
+  }
+
   for (
     const comparePath
     of [
