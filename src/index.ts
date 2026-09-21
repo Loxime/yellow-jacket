@@ -10,6 +10,11 @@ export {
 } from './core/runner.js';
 
 export {
+  runScenario,
+  validateCapture
+} from './core/scenario.js';
+
+export {
   baselinePath,
   compareWithBaseline,
   readBaseline,
@@ -38,5 +43,7 @@ export type {
   RouteDefinition,
   RouteExpectation,
   RouteRunResult,
+  ScenarioDefinition,
+  ScenarioStep,
   YellowJacketConfig
 } from './core/types.js';

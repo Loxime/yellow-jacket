@@ -20,6 +20,15 @@ export interface RouteDefinition {
   expect?: RouteExpectation;
 }
 
+export interface ScenarioStep extends RouteDefinition {
+  capture?: Record<string, string>;
+}
+
+export interface ScenarioDefinition {
+  name: string;
+  steps: ScenarioStep[];
+}
+
 export interface CompareConfig {
   ignore?: string[];
   redact?: string[];
@@ -31,7 +40,8 @@ export interface YellowJacketConfig {
   headers?: Record<string, string>;
   baselinePath?: string;
   compare?: CompareConfig;
-  routes: RouteDefinition[];
+  routes?: RouteDefinition[];
+  scenarios?: ScenarioDefinition[];
 }
 
 export interface ResponseSnapshot {
