@@ -1,5 +1,7 @@
 import type {
-  CoverageReport
+  CoverageReport,
+  Regression,
+  RunReport
 } from './types.js';
 
 function escapeMarkdownCell(
@@ -536,4 +538,427 @@ export function formatCoverageGitLab(
         0
     )
     .join('\n');
+}
+
+function runKey(
+  method: string,
+  route: string
+): string {
+  return `${method} ${route}`;
+}
+
+function formatBodyValue(
+  value: unknown
+): string {
+  const encoded =
+    JSON.stringify(
+      value
+    );
+
+  return encoded ===
+    undefined
+      ? String(value)
+      : encoded;
+}
+
+function regressionDetails(
+  regression: Regression
+): string[] {
+  const details =
+    regression.changes.filter(
+      (change) =>
+        change !==
+        'response body changed'
+    );
+
+  const bodyChanges =
+    regression.bodyChanges ??
+    [];
+
+  for (
+    const change
+    of bodyChanges
+  ) {
+    if (
+      change.kind ===
+      'changed'
+    ) {
+      details.push(
+        `${change.path}: ${formatBodyValue(
+          change.before
+        )} -> ${formatBodyValue(
+          change.after
+        )}`
+      );
+    } else if (
+      change.kind ===
+      'added'
+    ) {
+      details.push(
+        `${change.path} added: ${formatBodyValue(
+          change.after
+        )}`
+      );
+    } else {
+      details.push(
+        `${change.path} removed: ${formatBodyValue(
+          change.before
+        )}`
+      );
+    }
+  }
+
+  if (
+    bodyChanges.length === 0 &&
+    regression.changes.includes(
+      'response body changed'
+    )
+  ) {
+    details.push(
+      'response body changed'
+    );
+  }
+
+  return details;
+}
+
+export function formatRunMarkdown(
+  report: RunReport
+): string {
+  const failedAssertions =
+    report.results.filter(
+      (result) =>
+        !result.passed
+    );
+
+  const lines = [
+    '## 🐝 Yellow Jacket run',
+    '',
+    `**Result:** ${
+      report.passed
+        ? '✅ Passed'
+        : '❌ Failed'
+    }`,
+    `**Requests:** ${report.results.length}`,
+    `**Failed assertions:** ${failedAssertions.length}`,
+    `**Regressions:** ${report.regressions.length}`,
+    `**Baseline:** ${
+      report.baselineFound
+        ? 'loaded'
+        : 'not found'
+    }`
+  ];
+
+  if (
+    failedAssertions.length >
+    0
+  ) {
+    lines.push(
+      '',
+      '### Failed assertions'
+    );
+
+    for (
+      const result
+      of failedAssertions
+    ) {
+      lines.push(
+        `- \`${result.method} ${result.route}\` — ${
+          result.error ??
+          `request failed with status ${result.status}`
+        }`
+      );
+    }
+  }
+
+  if (
+    report.regressions.length >
+    0
+  ) {
+    lines.push(
+      '',
+      '### Regressions'
+    );
+
+    for (
+      const regression
+      of report.regressions
+    ) {
+      lines.push(
+        `- \`${regression.method} ${regression.route}\``
+      );
+
+      for (
+        const detail
+        of regressionDetails(
+          regression
+        )
+      ) {
+        lines.push(
+          `  - ${detail.replace(
+            /\r?\n/g,
+            ' '
+          )}`
+        );
+      }
+    }
+  }
+
+  if (
+    !report.baselineFound
+  ) {
+    lines.push(
+      '',
+      '> No baseline found. Regression comparison was skipped.'
+    );
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+export function formatRunGitHub(
+  report: RunReport
+): string {
+  const lines:
+    string[] = [];
+
+  for (
+    const result
+    of report.results
+  ) {
+    if (
+      result.passed
+    ) {
+      continue;
+    }
+
+    lines.push(
+      `::error title=Yellow Jacket assertion::${escapeGitHubCommandData(
+        `${result.method} ${result.route}: ${
+          result.error ??
+          `request failed with status ${result.status}`
+        }`
+      )}`
+    );
+  }
+
+  for (
+    const regression
+    of report.regressions
+  ) {
+    const details =
+      regressionDetails(
+        regression
+      );
+
+    lines.push(
+      `::error title=Yellow Jacket regression::${escapeGitHubCommandData(
+        `${regression.method} ${regression.route}: ${details.join(
+          '; '
+        )}`
+      )}`
+    );
+  }
+
+  if (
+    !report.baselineFound
+  ) {
+    lines.push(
+      '::warning title=Yellow Jacket baseline::No baseline found. Regression comparison was skipped.'
+    );
+  }
+
+  if (
+    report.passed
+  ) {
+    lines.push(
+      `::notice title=Yellow Jacket run::${escapeGitHubCommandData(
+        `${report.results.length} HTTP request(s) passed with no detected regressions.`
+      )}`
+    );
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+export function formatRunGitLab(
+  report: RunReport
+): string {
+  const regressions =
+    new Map<
+      string,
+      Regression
+    >();
+
+  for (
+    const regression
+    of report.regressions
+  ) {
+    regressions.set(
+      runKey(
+        regression.method,
+        regression.route
+      ),
+      regression
+    );
+  }
+
+  const seen =
+    new Set<string>();
+
+  const cases:
+    {
+      xml: string;
+      failed: boolean;
+    }[] = [];
+
+  for (
+    const result
+    of report.results
+  ) {
+    const key =
+      runKey(
+        result.method,
+        result.route
+      );
+
+    seen.add(
+      key
+    );
+
+    const messages:
+      string[] = [];
+
+    if (
+      !result.passed
+    ) {
+      messages.push(
+        result.error ??
+        `request failed with status ${result.status}`
+      );
+    }
+
+    const regression =
+      regressions.get(
+        key
+      );
+
+    if (
+      regression
+    ) {
+      messages.push(
+        ...regressionDetails(
+          regression
+        )
+      );
+    }
+
+    const name =
+      `${result.method} ${result.route}`;
+
+    if (
+      messages.length === 0
+    ) {
+      cases.push({
+        failed:
+          false,
+
+        xml:
+          `    <testcase classname="yellow-jacket.run" name="${escapeXml(
+            name
+          )}" time="${(
+            result.durationMs /
+            1000
+          ).toFixed(3)}" />`
+      });
+
+      continue;
+    }
+
+    cases.push({
+      failed:
+        true,
+
+      xml: [
+        `    <testcase classname="yellow-jacket.run" name="${escapeXml(
+          name
+        )}" time="${(
+          result.durationMs /
+          1000
+        ).toFixed(3)}">`,
+        `      <failure message="Yellow Jacket run failed">${escapeXml(
+          messages.join(
+            '\n'
+          )
+        )}</failure>`,
+        '    </testcase>'
+      ].join(
+        '\n'
+      )
+    });
+  }
+
+  for (
+    const regression
+    of report.regressions
+  ) {
+    const key =
+      runKey(
+        regression.method,
+        regression.route
+      );
+
+    if (
+      seen.has(
+        key
+      )
+    ) {
+      continue;
+    }
+
+    cases.push({
+      failed:
+        true,
+
+      xml: [
+        `    <testcase classname="yellow-jacket.run" name="${escapeXml(
+          `${regression.method} ${regression.route}`
+        )}">`,
+        `      <failure message="Yellow Jacket regression">${escapeXml(
+          regressionDetails(
+            regression
+          ).join(
+            '\n'
+          )
+        )}</failure>`,
+        '    </testcase>'
+      ].join(
+        '\n'
+      )
+    });
+  }
+
+  const failures =
+    cases.filter(
+      (item) =>
+        item.failed
+    ).length;
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<testsuite name="Yellow Jacket run" tests="${cases.length}" failures="${failures}" skipped="0">`,
+    ...cases.map(
+      (item) =>
+        item.xml
+    ),
+    `  <system-out>${escapeXml(
+      report.baselineFound
+        ? `${report.results.length} request(s), ${report.regressions.length} regression(s).`
+        : `${report.results.length} request(s). No baseline found; regression comparison was skipped.`
+    )}</system-out>`,
+    '</testsuite>',
+    ''
+  ].join(
+    '\n'
+  );
 }

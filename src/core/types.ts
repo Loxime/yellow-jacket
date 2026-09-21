@@ -111,6 +111,13 @@ export interface Regression {
   bodyChanges?: BodyChange[];
 }
 
+export interface RunReport {
+  baselineFound: boolean;
+  passed: boolean;
+  results: RouteRunResult[];
+  regressions: Regression[];
+}
+
 export interface CoverageOperation {
   method: CoverageMethod;
   path: string;

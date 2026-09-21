@@ -49,11 +49,15 @@ import {
   formatCoverageGitHub,
   formatCoverageGitLab,
   formatCoverageHtml,
-  formatCoverageMarkdown
+  formatCoverageMarkdown,
+  formatRunGitHub,
+  formatRunGitLab,
+  formatRunMarkdown
 } from './core/report.js';
 
 import type {
-  CoverageReport
+  CoverageReport,
+  RunReport
 } from './core/types.js';
 
 function printHelp(): void {
@@ -65,6 +69,8 @@ Usage:
   yellow-jacket desetup [--purge]
   yellow-jacket uninstall [--purge]
   yellow-jacket run [--allow-actions]
+  yellow-jacket run --github
+  yellow-jacket run --gitlab --output yellow-jacket-run.xml
   yellow-jacket baseline [--allow-actions]
   yellow-jacket coverage
   yellow-jacket coverage --json
@@ -382,10 +388,11 @@ async function main():
 
   if (
     values.github &&
-    command !== 'coverage'
+    command !== 'coverage' &&
+    command !== 'run'
   ) {
     console.error(
-      '--github is only supported by the coverage command.'
+      '--github is only supported by coverage and run.'
     );
 
     process.exitCode = 2;
@@ -394,10 +401,11 @@ async function main():
 
   if (
     values.gitlab &&
-    command !== 'coverage'
+    command !== 'coverage' &&
+    command !== 'run'
   ) {
     console.error(
-      '--gitlab is only supported by the coverage command.'
+      '--gitlab is only supported by coverage and run.'
     );
 
     process.exitCode = 2;
@@ -406,10 +414,25 @@ async function main():
 
   if (
     values.output &&
-    command !== 'coverage'
+    command !== 'coverage' &&
+    command !== 'run'
   ) {
     console.error(
-      '--output is only supported by the coverage command.'
+      '--output is only supported by coverage and run.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
+  if (
+    values.output &&
+    command === 'run' &&
+    !values.github &&
+    !values.gitlab
+  ) {
+    console.error(
+      '--output with run requires --github or --gitlab.'
     );
 
     process.exitCode = 2;
@@ -557,9 +580,20 @@ async function main():
       }
     );
 
-  printResults(
-    results
-  );
+  const structuredRunOutput =
+    command === 'run' &&
+    (
+      values.github ||
+      values.gitlab
+    );
+
+  if (
+    !structuredRunOutput
+  ) {
+    printResults(
+      results
+    );
+  }
 
   const failedAssertions =
     results.filter(
@@ -608,6 +642,91 @@ async function main():
           config.compare
         )
       : [];
+
+  const runReport:
+    RunReport = {
+      baselineFound:
+        baseline !==
+        null,
+
+      passed:
+        failedAssertions.length ===
+          0 &&
+        regressions.length ===
+          0,
+
+      results,
+      regressions
+    };
+
+  if (
+    structuredRunOutput
+  ) {
+    const rendered =
+      values.github
+        ? formatRunGitHub(
+            runReport
+          )
+        : formatRunGitLab(
+            runReport
+          );
+
+    if (
+      values.github &&
+      process.env.GITHUB_STEP_SUMMARY
+    ) {
+      await appendFile(
+        process.env.GITHUB_STEP_SUMMARY,
+        formatRunMarkdown(
+          runReport
+        ),
+        'utf8'
+      );
+    }
+
+    if (
+      values.output
+    ) {
+      const outputPath =
+        resolve(
+          process.cwd(),
+          values.output
+        );
+
+      await mkdir(
+        dirname(
+          outputPath
+        ),
+        {
+          recursive:
+            true
+        }
+      );
+
+      await writeFile(
+        outputPath,
+        rendered,
+        'utf8'
+      );
+
+      console.log(
+        `Run report written to ${outputPath}`
+      );
+    } else {
+      process.stdout.write(
+        rendered
+      );
+    }
+
+    if (
+      !runReport.passed
+    ) {
+      process.exitCode =
+        1;
+    }
+
+    return;
+  }
 
   for (
     const regression

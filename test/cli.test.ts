@@ -1114,3 +1114,156 @@ test(
     );
   }
 );
+
+test(
+  'run --github emits native regression annotations',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-run-github-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'https://api.example.test',
+  routes: [
+    {
+      name: 'create user',
+      method: 'POST',
+      path: '/users'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'run',
+          '--github'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.match(
+      result.stdout,
+      /::error title=Yellow Jacket assertion::/
+    );
+
+    assert.match(
+      result.stdout,
+      /Blocked POST request/
+    );
+  }
+);
+
+test(
+  'run --gitlab writes a native JUnit report',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-run-gitlab-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'https://api.example.test',
+  routes: [
+    {
+      name: 'create user',
+      method: 'POST',
+      path: '/users'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'run',
+          '--gitlab',
+          '--output',
+          'reports/yellow-jacket-run.xml'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    const xml =
+      await readFile(
+        join(
+          directory,
+          'reports',
+          'yellow-jacket-run.xml'
+        ),
+        'utf8'
+      );
+
+    assert.match(
+      xml,
+      /<testsuite name="Yellow Jacket run"/
+    );
+
+    assert.match(
+      xml,
+      /failures="1"/
+    );
+
+    assert.match(
+      xml,
+      /Blocked POST request/
+    );
+  }
+);

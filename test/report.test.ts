@@ -5,11 +5,15 @@ import {
   formatCoverageGitHub,
   formatCoverageGitLab,
   formatCoverageHtml,
-  formatCoverageMarkdown
+  formatCoverageMarkdown,
+  formatRunGitHub,
+  formatRunGitLab,
+  formatRunMarkdown
 } from '../src/core/report.js';
 
 import type {
-  CoverageReport
+  CoverageReport,
+  RunReport
 } from '../src/core/types.js';
 
 test(
@@ -281,6 +285,133 @@ test(
         '/tmp/openapi&api.yaml'
       ),
       false
+    );
+  }
+);
+
+const failingRunReport:
+  RunReport = {
+  baselineFound: true,
+  passed: false,
+
+  results: [
+    {
+      route: 'users',
+      method: 'GET',
+      url: 'http://localhost/users',
+      status: 500,
+      contentType: 'application/json',
+      body: { count: 0 },
+      durationMs: 12,
+      passed: false,
+      error: 'Expected status 200, received 500.'
+    }
+  ],
+
+  regressions: [
+    {
+      route: 'users',
+      method: 'GET',
+
+      changes: [
+        'status 200 -> 500',
+        'response body changed',
+        'header x-api-version "1" -> "2"'
+      ],
+
+      bodyChanges: [
+        {
+          path: '$.count',
+          kind: 'changed',
+          before: 1,
+          after: 0
+        }
+      ]
+    }
+  ]
+};
+
+test(
+  'formats an HTTP run as Markdown',
+  () => {
+    const output =
+      formatRunMarkdown(
+        failingRunReport
+      );
+
+    assert.match(
+      output,
+      /## 🐝 Yellow Jacket run/
+    );
+
+    assert.match(
+      output,
+      /❌ Failed/
+    );
+
+    assert.match(
+      output,
+      /status 200 -> 500/
+    );
+
+    assert.match(
+      output,
+      /\$\.count: 1 -> 0/
+    );
+  }
+);
+
+test(
+  'formats HTTP regressions as GitHub annotations',
+  () => {
+    const output =
+      formatRunGitHub(
+        failingRunReport
+      );
+
+    assert.match(
+      output,
+      /::error title=Yellow Jacket assertion::/
+    );
+
+    assert.match(
+      output,
+      /::error title=Yellow Jacket regression::/
+    );
+
+    assert.match(
+      output,
+      /x-api-version/
+    );
+  }
+);
+
+test(
+  'formats an HTTP run as GitLab JUnit XML',
+  () => {
+    const output =
+      formatRunGitLab(
+        failingRunReport
+      );
+
+    assert.match(
+      output,
+      /^<\?xml/
+    );
+
+    assert.match(
+      output,
+      /tests="1" failures="1"/
+    );
+
+    assert.match(
+      output,
+      /Yellow Jacket run failed/
+    );
+
+    assert.match(
+      output,
+      /status 200 -&gt; 500/
     );
   }
 );

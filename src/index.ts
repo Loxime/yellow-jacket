@@ -37,7 +37,10 @@ export {
   formatCoverageGitHub,
   formatCoverageGitLab,
   formatCoverageHtml,
-  formatCoverageMarkdown
+  formatCoverageMarkdown,
+  formatRunGitHub,
+  formatRunGitLab,
+  formatRunMarkdown
 } from './core/report.js';
 
 export {
@@ -74,6 +77,7 @@ export type {
   RouteExpectation,
   RouteRunResult,
   RunOptions,
+  RunReport,
   ScenarioDefinition,
   ScenarioStep,
   YellowJacketConfig

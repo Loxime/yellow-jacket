@@ -79,6 +79,41 @@ examples/ci/gitlab-ci.yml
 The Markdown report can be preserved as a job artifact even when the coverage
 gate fails.
 
+## HTTP regression reporting
+
+The native CI formats also work with the main regression runner.
+
+GitHub Actions:
+
+```bash
+yellow-jacket run --github
+```
+
+Failed expectations and detected baseline regressions are emitted as native
+workflow errors.
+
+This includes regressions in:
+
+- status codes
+- response bodies
+- selected response headers
+- redirect behavior
+- final redirect URLs
+
+GitLab:
+
+```bash
+yellow-jacket run \
+  --gitlab \
+  --output yellow-jacket-run.xml
+```
+
+The resulting file is a JUnit report and can be published with GitLab
+`artifacts:reports:junit`.
+
+If no baseline exists, request expectations are still checked and the native
+report explicitly states that regression comparison was skipped.
+
 ## Native GitHub Actions reporting
 
 Use:
