@@ -1,0 +1,24 @@
+yellow-jacket-coverage:
+  image: node:24
+
+  stage: test
+
+  script:
+    - npm ci
+    - |
+      set +e
+
+      npx yellow-jacket coverage --markdown \
+        > yellow-jacket-coverage.md
+
+      status=$?
+
+      cat yellow-jacket-coverage.md
+
+      exit "$status"
+
+  artifacts:
+    when: always
+    paths:
+      - yellow-jacket-coverage.md
+    expire_in: 1 week
