@@ -31,6 +31,7 @@ import {
 } from './core/runner.js';
 
 import {
+  formatCoverageHtml,
   formatCoverageMarkdown
 } from './core/report.js';
 
@@ -49,6 +50,7 @@ Usage:
   yellow-jacket coverage
   yellow-jacket coverage --json
   yellow-jacket coverage --markdown
+  yellow-jacket coverage --html
 
 Commands:
   init      Create a local yellow-jacket configuration.
@@ -150,6 +152,9 @@ async function main():
       markdown: {
         type: 'boolean'
       },
+      html: {
+        type: 'boolean'
+      },
       'allow-actions': {
         type: 'boolean'
       }
@@ -227,12 +232,20 @@ async function main():
     return;
   }
 
+  const coverageOutputFormats =
+    [
+      values.json,
+      values.markdown,
+      values.html
+    ].filter(
+      Boolean
+    ).length;
+
   if (
-    values.json &&
-    values.markdown
+    coverageOutputFormats > 1
   ) {
     console.error(
-      '--json and --markdown cannot be used together.'
+      '--json, --markdown and --html cannot be used together.'
     );
 
     process.exitCode = 2;
@@ -257,6 +270,18 @@ async function main():
   ) {
     console.error(
       '--markdown is only supported by the coverage command.'
+    );
+
+    process.exitCode = 2;
+    return;
+  }
+
+  if (
+    values.html &&
+    command !== 'coverage'
+  ) {
+    console.error(
+      '--html is only supported by the coverage command.'
     );
 
     process.exitCode = 2;
@@ -300,6 +325,14 @@ async function main():
     ) {
       process.stdout.write(
         formatCoverageMarkdown(
+          report
+        )
+      );
+    } else if (
+      values.html
+    ) {
+      process.stdout.write(
+        formatCoverageHtml(
           report
         )
       );

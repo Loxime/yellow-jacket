@@ -29,6 +29,7 @@ export {
 } from './core/coverage.js';
 
 export {
+  formatCoverageHtml,
   formatCoverageMarkdown
 } from './core/report.js';
 

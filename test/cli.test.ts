@@ -490,3 +490,155 @@ test(
     );
   }
 );
+
+test(
+  'coverage --html emits a standalone HTML report',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-html-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'openapi.json'
+      ),
+      JSON.stringify({
+        openapi:
+          '3.1.0',
+
+        info: {
+          title:
+            'HTML API',
+          version:
+            '1.0.0'
+        },
+
+        paths: {
+          '/health': {
+            get: {
+              responses: {}
+            }
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  coverage: {
+    openapi: './openapi.json',
+    minimum: 100
+  },
+  routes: [
+    {
+      name: 'health',
+      path: '/health'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'coverage',
+          '--html'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      0
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    assert.match(
+      result.stdout,
+      /^<!doctype html>/
+    );
+
+    assert.match(
+      result.stdout,
+      /<title>Yellow Jacket coverage<\/title>/
+    );
+
+    assert.match(
+      result.stdout,
+      /\/health/
+    );
+  }
+);
+
+test(
+  '--html is rejected outside the coverage command',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-html-invalid-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    const result =
+      await runCli(
+        [
+          'run',
+          '--html'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      2
+    );
+
+    assert.match(
+      result.stderr,
+      /--html is only supported by the coverage command/
+    );
+  }
+);
