@@ -1041,18 +1041,36 @@ test(
 test(
   'rejects invalid retry backoff and jitter configuration',
   async (t) => {
-    const directory =
+    const backoffDirectory =
       await mkdtemp(
         join(
           tmpdir(),
-          'yellow-jacket-retry-delay-config-'
+          'yellow-jacket-retry-backoff-config-'
+        )
+      );
+
+    const jitterDirectory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-retry-jitter-config-'
         )
       );
 
     t.after(
       async () => {
         await rm(
-          directory,
+          backoffDirectory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+
+        await rm(
+          jitterDirectory,
           {
             recursive:
               true,
@@ -1063,14 +1081,11 @@ test(
       }
     );
 
-    const configPath =
-      join(
-        directory,
-        'yellow-jacket.config.mjs'
-      );
-
     await writeFile(
-      configPath,
+      join(
+        backoffDirectory,
+        'yellow-jacket.config.mjs'
+      ),
       `export default {
   baseUrl: 'http://localhost',
   retries: {
@@ -1085,13 +1100,16 @@ test(
     await assert.rejects(
       () =>
         loadConfig(
-          directory
+          backoffDirectory
         ),
       /retry\.backoff must be "fixed" or "exponential"/
     );
 
     await writeFile(
-      configPath,
+      join(
+        jitterDirectory,
+        'yellow-jacket.config.mjs'
+      ),
       `export default {
   baseUrl: 'http://localhost',
   retries: {
@@ -1106,7 +1124,7 @@ test(
     await assert.rejects(
       () =>
         loadConfig(
-          directory
+          jitterDirectory
         ),
       /retry\.jitterMs must be a non-negative finite number/
     );
