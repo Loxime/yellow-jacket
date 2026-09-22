@@ -1,6 +1,6 @@
 {
   "name": "@falche/yellow-jacket",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "Developer-first HTTP regression testing for routes and API workflows.",
   "type": "module",
   "types": "./dist/src/index.d.ts",
