@@ -70,6 +70,7 @@ import {
 } from './core/report.js';
 
 import type {
+  BaselineFile,
   CoverageReport,
   RunReport,
   RunSelection
@@ -797,6 +798,36 @@ async function main():
     return;
   }
 
+  let baselineForUpdate:
+    BaselineFile | undefined;
+
+  if (
+    command ===
+      'baseline' &&
+    values.update
+  ) {
+    const existing =
+      await readBaseline(
+        config
+      );
+
+    if (
+      existing ===
+        null
+    ) {
+      console.error(
+        'Cannot update baseline because no baseline exists. Run "yellow-jacket baseline" first.'
+      );
+
+      process.exitCode =
+        2;
+      return;
+    }
+
+    baselineForUpdate =
+      existing;
+  }
+
   const results =
     await runSuite(
       selectedConfig,
@@ -849,25 +880,19 @@ async function main():
     if (
       values.update
     ) {
-      const existing =
-        await readBaseline(
-          config
+      if (
+        baselineForUpdate ===
+          undefined
+      ) {
+        throw new Error(
+          'Baseline update preflight was not completed.'
         );
-
-      if (!existing) {
-        console.error(
-          'Cannot update baseline because no baseline exists. Run "yellow-jacket baseline" first.'
-        );
-
-        process.exitCode =
-          2;
-        return;
       }
 
       const path =
         await updateBaseline(
           config,
-          existing,
+          baselineForUpdate,
           results
         );
 
