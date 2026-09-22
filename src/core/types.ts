@@ -123,6 +123,7 @@ export interface ResponseSnapshot {
 
 export interface RouteRunResult
   extends ResponseSnapshot {
+  attempts?: number;
   passed: boolean;
   error?: string;
 }

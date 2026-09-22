@@ -361,6 +361,14 @@ retry:
   false
 ```
 
+Every run result exposes the number of HTTP attempts performed.
+
+Retry information is included in CLI, JSON, Markdown, HTML, GitHub Actions and
+GitLab reports. Response duration covers the complete operation, including
+retry attempts and configured delays.
+
+Retry metadata is execution-only and is not persisted in baselines.
+
 ## Concurrency
 
 Top-level routes run sequentially by default.

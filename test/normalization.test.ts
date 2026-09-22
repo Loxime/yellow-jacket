@@ -442,6 +442,7 @@ test(
             },
 
             durationMs: 5,
+            attempts: 3,
             passed: true
           }
         ],
@@ -477,6 +478,13 @@ test(
     assert.equal(
       raw.includes(
         'super-secret'
+      ),
+      false
+    );
+
+    assert.equal(
+      raw.includes(
+        '"attempts"'
       ),
       false
     );

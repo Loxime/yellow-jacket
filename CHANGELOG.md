@@ -10,6 +10,12 @@ All notable changes to Yellow Jacket are documented in this file.
 - GitLab bug, feature and user-feedback issue templates
 - contribution and responsible bug-reporting guidance
 
+### Retry observability
+
+- expose the actual HTTP attempt count in run results
+- surface retried requests in CLI, JSON, Markdown, HTML, GitHub and GitLab reports
+- keep retry execution metadata out of stored baselines
+
 ## 0.2.0
 
 ### Request resilience

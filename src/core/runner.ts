@@ -633,6 +633,8 @@ export async function runRoute(
         durationSince(
           startedAt
         ),
+      attempts:
+        0,
       passed:
         false,
       error:
@@ -869,6 +871,9 @@ export async function runRoute(
           ),
         durationMs,
 
+        attempts:
+          attempt,
+
         ...(Object.keys(
           responseHeaders
         ).length >
@@ -927,6 +932,8 @@ export async function runRoute(
           durationSince(
             startedAt
           ),
+        attempts:
+          attempt,
         passed:
           false,
         error:

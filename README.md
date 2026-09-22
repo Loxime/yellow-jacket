@@ -314,6 +314,12 @@ to repeat:
 
 Set `retry: false` on a route or scenario step to disable inherited retries.
 
+Run results expose the number of HTTP attempts performed. CLI, JSON, Markdown,
+HTML, GitHub Actions and GitLab reports surface retried requests.
+
+Response duration includes the complete operation, including retry attempts and
+configured retry delays.
+
 ## Route concurrency
 
 Independent top-level routes are sequential by default.

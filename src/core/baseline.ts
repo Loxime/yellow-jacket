@@ -136,6 +136,7 @@ function snapshotFromResult(
   const {
     passed: _passed,
     error: _error,
+    attempts: _attempts,
     ...snapshot
   } = result;
 
@@ -168,14 +169,10 @@ export async function writeBaseline(
     baseUrl: config.baseUrl,
 
     responses: results.map(
-      ({
-        passed: _passed,
-        error: _error,
-        ...snapshot
-      }) =>
-        normalizeSnapshot(
-          snapshot,
-          config.compare
+      (result) =>
+        snapshotFromResult(
+          config,
+          result
         )
     )
   };

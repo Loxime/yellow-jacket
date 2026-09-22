@@ -562,3 +562,112 @@ test(
     );
   }
 );
+
+test(
+  'reports retry attempts across run output formats',
+  () => {
+    const report:
+      RunReport = {
+        baselineFound:
+          true,
+        passed:
+          true,
+
+        results: [
+          {
+            route:
+              'health',
+            method:
+              'GET',
+            url:
+              'http://localhost/health',
+            status:
+              200,
+            contentType:
+              'application/json',
+            body: {
+              ok:
+                true
+            },
+            durationMs:
+              125,
+            attempts:
+              2,
+            passed:
+              true
+          }
+        ],
+
+        regressions:
+          []
+      };
+
+    const markdown =
+      formatRunMarkdown(
+        report
+      );
+
+    assert.match(
+      markdown,
+      /\*\*HTTP attempts:\*\* 2/
+    );
+
+    assert.match(
+      markdown,
+      /\*\*Retried requests:\*\* 1/
+    );
+
+    const github =
+      formatRunGitHub(
+        report
+      );
+
+    assert.match(
+      github,
+      /Yellow Jacket retry/
+    );
+
+    assert.match(
+      github,
+      /passed after 2 attempts/
+    );
+
+    const gitlab =
+      formatRunGitLab(
+        report
+      );
+
+    assert.match(
+      gitlab,
+      /2 HTTP attempts/
+    );
+
+    const html =
+      formatRunHtml(
+        report
+      );
+
+    assert.match(
+      html,
+      /<th>Attempts<\/th>/
+    );
+
+    assert.match(
+      html,
+      /HTTP attempts/
+    );
+
+    const json =
+      JSON.parse(
+        formatRunJson(
+          report
+        )
+      ) as RunReport;
+
+    assert.equal(
+      json.results[0]
+        ?.attempts,
+      2
+    );
+  }
+);

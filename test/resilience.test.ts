@@ -294,6 +294,11 @@ test(
     );
 
     assert.equal(
+      result.attempts,
+      2
+    );
+
+    assert.equal(
       result.passed,
       true
     );
