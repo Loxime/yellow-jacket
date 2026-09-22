@@ -8,3 +8,5 @@ coverage/
 .yellow-jacket/runs/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+
+*.tgz
