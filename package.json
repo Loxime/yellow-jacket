@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "description": "Developer-first HTTP regression testing for routes and API workflows.",
   "type": "module",
+  "types": "./dist/src/index.d.ts",
   "bin": {
     "yellow-jacket": "./dist/src/cli.js"
   },
@@ -13,7 +14,7 @@
     }
   },
   "files": [
-    "dist",
+    "dist/src",
     "README.md"
   ],
   "scripts": {
