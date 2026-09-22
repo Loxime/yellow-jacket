@@ -164,16 +164,10 @@ function expectedHeaderErrors(
       );
 
     if (
+      actual ===
+        null ||
       !values.includes(
-        actual ??
-        ''
-      ) ||
-      (
-        actual ===
-          null &&
-        !values.includes(
-          ''
-        )
+        actual
       )
     ) {
       errors.push(
@@ -548,6 +542,31 @@ async function wait(
   );
 }
 
+function explicitlyAcceptsStatus(
+  route: RouteDefinition,
+  status: number
+): boolean {
+  const expected =
+    route.expect
+      ?.status;
+
+  if (
+    expected ===
+      undefined
+  ) {
+    return false;
+  }
+
+  return Array.isArray(
+    expected
+  )
+    ? expected.includes(
+        status
+      )
+    : expected ===
+        status;
+}
+
 function shouldRetryStatus(
   route: RouteDefinition,
   status: number,
@@ -560,7 +579,7 @@ function shouldRetryStatus(
     retry.statuses.has(
       status
     ) &&
-    !expectedStatusMatches(
+    !explicitlyAcceptsStatus(
       route,
       status
     )

@@ -706,3 +706,262 @@ test(
     );
   }
 );
+
+test(
+  'retries transient statuses when no status expectation is configured',
+  async (t) => {
+    let requests =
+      0;
+
+    const server =
+      createServer(
+        (
+          _request,
+          response
+        ) => {
+          requests +=
+            1;
+
+          if (
+            requests ===
+              1
+          ) {
+            response.statusCode =
+              503;
+
+            response.end(
+              'retry'
+            );
+
+            return;
+          }
+
+          response.statusCode =
+            200;
+
+          response.end(
+            'ok'
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => {
+        server.close();
+      }
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            `http://127.0.0.1:${address.port}`,
+
+          retries: {
+            maxAttempts:
+              2
+          }
+        },
+        {
+          path:
+            '/'
+        }
+      );
+
+    assert.equal(
+      requests,
+      2
+    );
+
+    assert.equal(
+      result.status,
+      200
+    );
+
+    assert.equal(
+      result.passed,
+      true
+    );
+  }
+);
+
+test(
+  'does not retry a transient status explicitly accepted by expectations',
+  async (t) => {
+    let requests =
+      0;
+
+    const server =
+      createServer(
+        (
+          _request,
+          response
+        ) => {
+          requests +=
+            1;
+
+          response.statusCode =
+            503;
+
+          response.end(
+            'accepted'
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => {
+        server.close();
+      }
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            `http://127.0.0.1:${address.port}`,
+
+          retries: {
+            maxAttempts:
+              3
+          }
+        },
+        {
+          path:
+            '/',
+
+          expect: {
+            status: [
+              200,
+              503
+            ]
+          }
+        }
+      );
+
+    assert.equal(
+      requests,
+      1
+    );
+
+    assert.equal(
+      result.status,
+      503
+    );
+
+    assert.equal(
+      result.passed,
+      true
+    );
+  }
+);
+
+test(
+  'does not treat a missing header as an empty expected header value',
+  async (t) => {
+    const server =
+      createServer(
+        (
+          _request,
+          response
+        ) => {
+          response.end(
+            'ok'
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => {
+        server.close();
+      }
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            `http://127.0.0.1:${address.port}`
+        },
+        {
+          path:
+            '/',
+
+          expect: {
+            headers: {
+              'x-empty':
+                ''
+            }
+          }
+        }
+      );
+
+    assert.equal(
+      result.passed,
+      false
+    );
+
+    assert.match(
+      result.error ??
+        '',
+      /Expected header x-empty "", received null/
+    );
+  }
+);
