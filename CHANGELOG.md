@@ -2,6 +2,15 @@
 
 All notable changes to Yellow Jacket are documented in this file.
 
+## 0.1.1
+
+Registry recovery release.
+
+- first installable npm release under `@falche/yellow-jacket`
+- same Yellow Jacket functionality as 0.1.0
+- version bumped because npm considers `@falche/yellow-jacket@0.1.0`
+  previously published while no installable 0.1.0 is available
+
 ## 0.1.0
 
 Initial public release.
