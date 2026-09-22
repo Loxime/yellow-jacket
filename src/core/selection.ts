@@ -189,19 +189,18 @@ export function countRunTargets(
   );
 }
 
-function selectedLabels(
+function selectedSnapshotKeys(
   config: YellowJacketConfig
 ): Set<string> {
-  const labels =
+  const keys =
     new Set<string>();
 
   for (
     const route
     of config.routes ?? []
   ) {
-    labels.add(
-      route.name ??
-      route.path
+    keys.add(
+      `${route.method ?? 'GET'} ${route.name ?? route.path}`
     );
   }
 
@@ -213,21 +212,21 @@ function selectedLabels(
       const step
       of scenario.steps
     ) {
-      labels.add(
-        `${scenario.name} > ${step.name ?? step.path}`
+      keys.add(
+        `${step.method ?? 'GET'} ${scenario.name} > ${step.name ?? step.path}`
       );
     }
   }
 
-  return labels;
+  return keys;
 }
 
 export function filterBaselineForRun(
   baseline: BaselineFile,
   config: YellowJacketConfig
 ): BaselineFile {
-  const labels =
-    selectedLabels(
+  const keys =
+    selectedSnapshotKeys(
       config
     );
 
@@ -237,8 +236,8 @@ export function filterBaselineForRun(
     responses:
       baseline.responses.filter(
         (response) =>
-          labels.has(
-            response.route
+          keys.has(
+            `${response.method} ${response.route}`
           )
       )
   };

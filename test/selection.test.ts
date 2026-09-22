@@ -301,3 +301,112 @@ test(
     );
   }
 );
+
+test(
+  'filters baseline entries by method when selected labels collide',
+  () => {
+    const collisionConfig:
+      YellowJacketConfig = {
+        baseUrl:
+          'http://localhost',
+
+        routes: [
+          {
+            name:
+              'users',
+            method:
+              'GET',
+            path:
+              '/users',
+            tags: [
+              'read'
+            ]
+          },
+          {
+            name:
+              'users',
+            method:
+              'POST',
+            path:
+              '/users',
+            tags: [
+              'write'
+            ]
+          }
+        ]
+      };
+
+    const baseline:
+      BaselineFile = {
+        formatVersion:
+          1,
+        createdAt:
+          new Date(0)
+            .toISOString(),
+        baseUrl:
+          'http://localhost',
+
+        responses: [
+          {
+            route:
+              'users',
+            method:
+              'GET',
+            url:
+              'http://localhost/users',
+            status:
+              200,
+            contentType:
+              null,
+            body:
+              null,
+            durationMs:
+              1
+          },
+          {
+            route:
+              'users',
+            method:
+              'POST',
+            url:
+              'http://localhost/users',
+            status:
+              201,
+            contentType:
+              null,
+            body:
+              null,
+            durationMs:
+              1
+          }
+        ]
+      };
+
+    const selected =
+      selectRunConfig(
+        collisionConfig,
+        {
+          tags: [
+            'read'
+          ]
+        }
+      );
+
+    const filtered =
+      filterBaselineForRun(
+        baseline,
+        selected
+      );
+
+    assert.deepEqual(
+      filtered.responses.map(
+        (response) =>
+          `${response.method} ${response.route}`
+      ),
+      [
+        'GET users'
+      ]
+    );
+  }
+);
+
