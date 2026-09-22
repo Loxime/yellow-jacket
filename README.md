@@ -246,6 +246,22 @@ expect: {
 Duration is treated as an explicit budget rather than a baseline value, avoiding
 noisy timing regressions between runs.
 
+`timeoutMs` controls request cancellation and can be configured globally or
+overridden on an individual route or scenario step:
+
+```js
+{
+  path:
+    '/slow-report',
+
+  timeoutMs:
+    30_000
+}
+```
+
+`timeoutMs` controls how long Yellow Jacket waits for the HTTP operation.
+`expect.maxDurationMs` is a separate assertion on the completed operation.
+
 ## Response header expectations
 
 Response headers can be asserted directly without adding them to the baseline:
@@ -284,6 +300,12 @@ retries: {
   jitterMs:
     50,
 
+  respectRetryAfter:
+    true,
+
+  maxRetryDelayMs:
+    10_000,
+
   statuses: [
     429,
     502,
@@ -299,6 +321,11 @@ statuses.
 `delayMs` uses a fixed delay by default. Set `backoff: 'exponential'` to double
 the base delay after each failed attempt. `jitterMs` adds up to the configured
 number of random milliseconds to each retry delay.
+
+`respectRetryAfter: true` honors a valid server `Retry-After` header when its
+delay is longer than the locally calculated retry delay. Both delta-seconds and
+HTTP-date values are supported. `maxRetryDelayMs` can cap the final delay,
+including delays derived from `Retry-After`.
 
 Mutating methods are never retried by default, even when global retries are
 enabled. Explicitly opt in for a route when the operation is known to be safe

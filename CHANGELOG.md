@@ -2,6 +2,20 @@
 
 All notable changes to Yellow Jacket are documented in this file.
 
+## Unreleased
+
+### Retry-After handling
+
+- optionally honor server-provided `Retry-After` delays
+- support delta-seconds and HTTP-date `Retry-After` values
+- optionally cap effective retry delays with `maxRetryDelayMs`
+
+### Request timeouts
+
+- allow routes and scenario steps to override the global request timeout
+- validate global and per-request timeout values
+- keep request cancellation separate from response-duration expectations
+
 ## 0.3.0
 
 ### Community

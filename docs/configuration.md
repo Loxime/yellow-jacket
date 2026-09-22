@@ -114,6 +114,30 @@ timeoutMs:
 
 When omitted, Yellow Jacket uses a 10 second timeout.
 
+Routes and scenario steps can override the global timeout:
+
+```js
+{
+  path:
+    '/slow-report',
+
+  timeoutMs:
+    30_000
+}
+```
+
+The most specific value wins:
+
+```text
+route or scenario step timeoutMs
+global timeoutMs
+10 second default
+```
+
+Request timeout and duration expectations serve different purposes.
+`timeoutMs` aborts the HTTP operation, while `expect.maxDurationMs` evaluates a
+completed operation against an explicit performance budget.
+
 ## Shared headers
 
 Headers can be declared once:
@@ -323,6 +347,12 @@ retries: {
   jitterMs:
     50,
 
+  respectRetryAfter:
+    true,
+
+  maxRetryDelayMs:
+    10_000,
+
   statuses: [
     408,
     425,
@@ -359,6 +389,41 @@ delayMs * 4
 `jitterMs` adds a random value from `0` up to the configured number of
 milliseconds to each calculated retry delay. Set it to `0` or omit it for
 deterministic delays.
+
+Server-provided retry timing is opt-in:
+
+```js
+respectRetryAfter:
+  true
+```
+
+When enabled, Yellow Jacket accepts `Retry-After` as either delta-seconds:
+
+```text
+Retry-After: 5
+```
+
+or an HTTP date:
+
+```text
+Retry-After: Wed, 23 Sep 2026 10:00:00 GMT
+```
+
+The server delay acts as a minimum: Yellow Jacket waits for whichever is longer,
+the locally calculated delay or the valid `Retry-After` delay.
+
+A maximum can be configured:
+
+```js
+maxRetryDelayMs:
+  10_000
+```
+
+This caps the final retry delay, including exponential backoff, jitter and
+`Retry-After`. Omitting it leaves the retry delay uncapped.
+
+`Retry-After` is ignored unless `respectRetryAfter` is enabled. Invalid header
+values fall back to the locally calculated retry delay.
 
 A status explicitly accepted by `expect.status` is not retried.
 

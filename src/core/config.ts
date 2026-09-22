@@ -248,6 +248,32 @@ function validateExpectation(
   }
 }
 
+function validateTimeout(
+  timeoutMs: number | undefined,
+  source: string
+): void {
+  if (
+    timeoutMs ===
+      undefined
+  ) {
+    return;
+  }
+
+  if (
+    typeof timeoutMs !==
+      'number' ||
+    !Number.isFinite(
+      timeoutMs
+    ) ||
+    timeoutMs <=
+      0
+  ) {
+    throw new Error(
+      `${source} timeoutMs must be a positive finite number.`
+    );
+  }
+}
+
 function validateRetry(
   retry:
     RetryConfig |
@@ -340,6 +366,35 @@ function validateRetry(
   ) {
     throw new Error(
       `${source} retry.jitterMs must be a non-negative finite number.`
+    );
+  }
+
+  if (
+    retry.respectRetryAfter !==
+      undefined &&
+    typeof retry.respectRetryAfter !==
+      'boolean'
+  ) {
+    throw new Error(
+      `${source} retry.respectRetryAfter must be a boolean.`
+    );
+  }
+
+  if (
+    retry.maxRetryDelayMs !==
+      undefined &&
+    (
+      typeof retry.maxRetryDelayMs !==
+        'number' ||
+      !Number.isFinite(
+        retry.maxRetryDelayMs
+      ) ||
+      retry.maxRetryDelayMs <
+        0
+    )
+  ) {
+    throw new Error(
+      `${source} retry.maxRetryDelayMs must be a non-negative finite number.`
     );
   }
 
@@ -487,6 +542,11 @@ export async function loadConfig(
     );
   }
 
+  validateTimeout(
+    config.timeoutMs,
+    path
+  );
+
   validateRetry(
     config.retries,
     `${path} retries`
@@ -571,6 +631,11 @@ export async function loadConfig(
       source
     );
 
+    validateTimeout(
+      route.timeoutMs,
+      source
+    );
+
     validateExpectation(
       route,
       source
@@ -629,6 +694,11 @@ export async function loadConfig(
 
       validateRedirect(
         step,
+        source
+      );
+
+      validateTimeout(
+        step.timeoutMs,
         source
       );
 
