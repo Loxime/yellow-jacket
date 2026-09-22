@@ -41,6 +41,8 @@ interface EffectiveRetryConfig {
   delayMs: number;
   backoff: RetryBackoff;
   jitterMs: number;
+  respectRetryAfter: boolean;
+  maxRetryDelayMs: number | undefined;
   statuses: ReadonlySet<number>;
 }
 
@@ -457,6 +459,22 @@ function nonNegativeDelay(
     : 0;
 }
 
+function optionalNonNegativeDelay(
+  value: number | undefined
+): number | undefined {
+  return (
+    value !==
+      undefined &&
+    Number.isFinite(
+      value
+    ) &&
+    value >=
+      0
+  )
+    ? value
+    : undefined;
+}
+
 function effectiveRetryConfig(
   config: YellowJacketConfig,
   route: RouteDefinition,
@@ -475,6 +493,10 @@ function effectiveRetryConfig(
         'fixed',
       jitterMs:
         0,
+      respectRetryAfter:
+        false,
+      maxRetryDelayMs:
+        undefined,
       statuses:
         new Set()
     };
@@ -526,6 +548,17 @@ function effectiveRetryConfig(
       globalRetry.jitterMs
     );
 
+  const respectRetryAfter =
+    routeRetry.respectRetryAfter ??
+    globalRetry.respectRetryAfter ??
+    false;
+
+  const maxRetryDelayMs =
+    optionalNonNegativeDelay(
+      routeRetry.maxRetryDelayMs ??
+      globalRetry.maxRetryDelayMs
+    );
+
   const statuses =
     new Set<number>(
       routeRetry.statuses ??
@@ -538,6 +571,8 @@ function effectiveRetryConfig(
     delayMs,
     backoff,
     jitterMs,
+    respectRetryAfter,
+    maxRetryDelayMs,
     statuses
   };
 }
@@ -575,15 +610,150 @@ export function calculateRetryDelay(
   );
 }
 
+export function parseRetryAfter(
+  value: string | null,
+  nowMs = Date.now()
+): number | undefined {
+  if (
+    value ===
+      null
+  ) {
+    return undefined;
+  }
+
+  const normalized =
+    value.trim();
+
+  if (
+    /^\d+$/.test(
+      normalized
+    )
+  ) {
+    const seconds =
+      Number(
+        normalized
+      );
+
+    const delayMs =
+      seconds *
+      1_000;
+
+    return Number.isSafeInteger(
+      delayMs
+    )
+      ? delayMs
+      : undefined;
+  }
+
+  const httpDatePattern =
+    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), [0-9]{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{4} [0-9]{2}:[0-9]{2}:[0-9]{2} GMT$/;
+
+  if (
+    !httpDatePattern.test(
+      normalized
+    )
+  ) {
+    return undefined;
+  }
+
+  const timestamp =
+    Date.parse(
+      normalized
+    );
+
+  if (
+    !Number.isFinite(
+      timestamp
+    ) ||
+    new Date(
+      timestamp
+    ).toUTCString() !==
+      normalized
+  ) {
+    return undefined;
+  }
+
+  return Math.max(
+    0,
+    timestamp -
+      nowMs
+  );
+}
+
+export function calculateEffectiveRetryDelay(
+  delayMs: number,
+  backoff: RetryBackoff,
+  jitterMs: number,
+  attempt: number,
+  retryAfterMs: number | undefined,
+  maxRetryDelayMs: number | undefined,
+  randomValue = Math.random()
+): number {
+  const calculatedDelay =
+    calculateRetryDelay(
+      delayMs,
+      backoff,
+      jitterMs,
+      attempt,
+      randomValue
+    );
+
+  const validRetryAfter =
+    optionalNonNegativeDelay(
+      retryAfterMs
+    );
+
+  const requiredDelay =
+    validRetryAfter ===
+      undefined
+      ? calculatedDelay
+      : Math.max(
+          calculatedDelay,
+          validRetryAfter
+        );
+
+  const validMaximum =
+    optionalNonNegativeDelay(
+      maxRetryDelayMs
+    );
+
+  const effectiveDelay =
+    validMaximum ===
+      undefined
+      ? requiredDelay
+      : Math.min(
+          requiredDelay,
+          validMaximum
+        );
+
+  return (
+    Math.round(
+      effectiveDelay *
+      100
+    ) /
+    100
+  );
+}
+
 function retryDelay(
   retry: EffectiveRetryConfig,
-  attempt: number
+  attempt: number,
+  retryAfter: string | null = null
 ): number {
-  return calculateRetryDelay(
+  const retryAfterMs =
+    retry.respectRetryAfter
+      ? parseRetryAfter(
+          retryAfter
+        )
+      : undefined;
+
+  return calculateEffectiveRetryDelay(
     retry.delayMs,
     retry.backoff,
     retry.jitterMs,
-    attempt
+    attempt,
+    retryAfterMs,
+    retry.maxRetryDelayMs
   );
 }
 
@@ -825,7 +995,10 @@ export async function runRoute(
         await wait(
           retryDelay(
             retry,
-            attempt
+            attempt,
+            response.headers.get(
+              'retry-after'
+            )
           )
         );
 

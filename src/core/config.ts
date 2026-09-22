@@ -344,6 +344,35 @@ function validateRetry(
   }
 
   if (
+    retry.respectRetryAfter !==
+      undefined &&
+    typeof retry.respectRetryAfter !==
+      'boolean'
+  ) {
+    throw new Error(
+      `${source} retry.respectRetryAfter must be a boolean.`
+    );
+  }
+
+  if (
+    retry.maxRetryDelayMs !==
+      undefined &&
+    (
+      typeof retry.maxRetryDelayMs !==
+        'number' ||
+      !Number.isFinite(
+        retry.maxRetryDelayMs
+      ) ||
+      retry.maxRetryDelayMs <
+        0
+    )
+  ) {
+    throw new Error(
+      `${source} retry.maxRetryDelayMs must be a non-negative finite number.`
+    );
+  }
+
+  if (
     retry.statuses !==
       undefined &&
     (

@@ -1130,3 +1130,236 @@ test(
     );
   }
 );
+
+test(
+  'parses Retry-After seconds and HTTP dates',
+  async () => {
+    const {
+      parseRetryAfter
+    } =
+      await import(
+        '../src/core/runner.js'
+      );
+
+    const now =
+      Date.UTC(
+        2026,
+        8,
+        22,
+        12,
+        0,
+        0
+      );
+
+    assert.equal(
+      parseRetryAfter(
+        '3',
+        now
+      ),
+      3_000
+    );
+
+    assert.equal(
+      parseRetryAfter(
+        new Date(
+          now +
+          5_000
+        ).toUTCString(),
+        now
+      ),
+      5_000
+    );
+
+    assert.equal(
+      parseRetryAfter(
+        new Date(
+          now -
+          5_000
+        ).toUTCString(),
+        now
+      ),
+      0
+    );
+
+    assert.equal(
+      parseRetryAfter(
+        '1.5',
+        now
+      ),
+      undefined
+    );
+
+    assert.equal(
+      parseRetryAfter(
+        'not-a-date',
+        now
+      ),
+      undefined
+    );
+
+    assert.equal(
+      parseRetryAfter(
+        null,
+        now
+      ),
+      undefined
+    );
+  }
+);
+
+test(
+  'combines local retry delay with Retry-After and a maximum',
+  async () => {
+    const {
+      calculateEffectiveRetryDelay
+    } =
+      await import(
+        '../src/core/runner.js'
+      );
+
+    assert.equal(
+      calculateEffectiveRetryDelay(
+        100,
+        'exponential',
+        0,
+        2,
+        500,
+        undefined,
+        0
+      ),
+      500
+    );
+
+    assert.equal(
+      calculateEffectiveRetryDelay(
+        100,
+        'exponential',
+        0,
+        2,
+        50,
+        undefined,
+        0
+      ),
+      200
+    );
+
+    assert.equal(
+      calculateEffectiveRetryDelay(
+        100,
+        'exponential',
+        0,
+        2,
+        500,
+        300,
+        0
+      ),
+      300
+    );
+
+    assert.equal(
+      calculateEffectiveRetryDelay(
+        100,
+        'exponential',
+        0,
+        3,
+        undefined,
+        250,
+        0
+      ),
+      250
+    );
+  }
+);
+
+test(
+  'rejects invalid Retry-After retry configuration',
+  async (t) => {
+    const retryAfterDirectory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-retry-after-config-'
+        )
+      );
+
+    const maximumDirectory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-retry-maximum-config-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          retryAfterDirectory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+
+        await rm(
+          maximumDirectory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        retryAfterDirectory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  retries: {
+    respectRetryAfter: 'yes'
+  },
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      () =>
+        loadConfig(
+          retryAfterDirectory
+        ),
+      /retry\.respectRetryAfter must be a boolean/
+    );
+
+    await writeFile(
+      join(
+        maximumDirectory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  retries: {
+    maxRetryDelayMs: -1
+  },
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      () =>
+        loadConfig(
+          maximumDirectory
+        ),
+      /retry\.maxRetryDelayMs must be a non-negative finite number/
+    );
+  }
+);

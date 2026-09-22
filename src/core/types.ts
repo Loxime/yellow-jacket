@@ -25,6 +25,8 @@ export interface RetryConfig {
   delayMs?: number;
   backoff?: RetryBackoff;
   jitterMs?: number;
+  respectRetryAfter?: boolean;
+  maxRetryDelayMs?: number;
   statuses?: number[];
   retryActions?: boolean;
 }

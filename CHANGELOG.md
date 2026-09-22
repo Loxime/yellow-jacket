@@ -2,6 +2,8 @@
 
 All notable changes to Yellow Jacket are documented in this file.
 
+## Unreleased
+
 ## 0.3.0
 
 ### Community
