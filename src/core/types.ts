@@ -16,10 +16,25 @@ export type RedirectMode =
   | 'error'
   | 'manual';
 
+export interface RetryConfig {
+  maxAttempts?: number;
+  delayMs?: number;
+  statuses?: number[];
+  retryActions?: boolean;
+}
+
 export interface RouteExpectation {
   status?: number | number[];
-  contentType?: string | string[];
+
+  contentType?:
+    string | string[];
+
   maxDurationMs?: number;
+
+  headers?: Record<
+    string,
+    string | string[]
+  >;
 }
 
 export interface RouteDefinition {
@@ -30,6 +45,7 @@ export interface RouteDefinition {
   headers?: Record<string, string>;
   body?: unknown;
   redirect?: RedirectMode;
+  retry?: RetryConfig | false;
   expect?: RouteExpectation;
 }
 
@@ -63,6 +79,11 @@ export interface CoverageConfig {
 export interface YellowJacketConfig {
   baseUrl: string;
   timeoutMs?: number;
+
+  concurrency?: number;
+
+  retries?: RetryConfig;
+
   headers?: Record<string, string>;
   baselinePath?: string;
   compare?: CompareConfig;
@@ -90,12 +111,18 @@ export interface ResponseSnapshot {
   contentType: string | null;
   body: unknown;
   durationMs: number;
-  responseHeaders?: Record<string, string | null>;
+
+  responseHeaders?: Record<
+    string,
+    string | null
+  >;
+
   redirected?: boolean;
   finalUrl?: string;
 }
 
-export interface RouteRunResult extends ResponseSnapshot {
+export interface RouteRunResult
+  extends ResponseSnapshot {
   passed: boolean;
   error?: string;
 }

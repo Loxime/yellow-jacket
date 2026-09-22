@@ -19,6 +19,7 @@ import {
 } from './scenario.js';
 
 import type {
+  RetryConfig,
   RouteDefinition,
   YellowJacketConfig
 } from './types.js';
@@ -78,10 +79,55 @@ function validateTags(
   }
 }
 
+function validHttpStatus(
+  value: unknown
+): value is number {
+  return (
+    typeof value ===
+      'number' &&
+    Number.isInteger(
+      value
+    ) &&
+    value >=
+      100 &&
+    value <=
+      599
+  );
+}
+
 function validateExpectation(
   route: RouteDefinition,
   source: string
 ): void {
+  const status =
+    route.expect?.status;
+
+  if (
+    status !==
+    undefined
+  ) {
+    const valid =
+      Array.isArray(
+        status
+      )
+        ? (
+            status.length >
+              0 &&
+            status.every(
+              validHttpStatus
+            )
+          )
+        : validHttpStatus(
+            status
+          );
+
+    if (!valid) {
+      throw new Error(
+        `${source} expect.status must be an HTTP status or non-empty array of HTTP statuses.`
+      );
+    }
+  }
+
   const contentType =
     route.expect?.contentType;
 
@@ -116,6 +162,69 @@ function validateExpectation(
     }
   }
 
+  const expectedHeaders =
+    route.expect?.headers;
+
+  if (
+    expectedHeaders !==
+    undefined
+  ) {
+    if (
+      expectedHeaders ===
+        null ||
+      typeof expectedHeaders !==
+        'object' ||
+      Array.isArray(
+        expectedHeaders
+      )
+    ) {
+      throw new Error(
+        `${source} expect.headers must be an object.`
+      );
+    }
+
+    for (
+      const [
+        name,
+        expected
+      ]
+      of Object.entries(
+        expectedHeaders
+      )
+    ) {
+      if (
+        name.trim().length ===
+          0
+      ) {
+        throw new Error(
+          `${source} expect.headers contains an empty header name.`
+        );
+      }
+
+      const valid =
+        typeof expected ===
+          'string' ||
+        (
+          Array.isArray(
+            expected
+          ) &&
+          expected.length >
+            0 &&
+          expected.every(
+            (value) =>
+              typeof value ===
+                'string'
+          )
+        );
+
+      if (!valid) {
+        throw new Error(
+          `${source} expect.headers.${name} must be a string or non-empty array of strings.`
+        );
+      }
+    }
+  }
+
   const maxDurationMs =
     route.expect
       ?.maxDurationMs;
@@ -135,6 +244,102 @@ function validateExpectation(
   ) {
     throw new Error(
       `${source} expect.maxDurationMs must be a positive finite number.`
+    );
+  }
+}
+
+function validateRetry(
+  retry:
+    RetryConfig |
+    false |
+    undefined,
+  source: string
+): void {
+  if (
+    retry ===
+      undefined ||
+    retry ===
+      false
+  ) {
+    return;
+  }
+
+  if (
+    retry ===
+      null ||
+    typeof retry !==
+      'object' ||
+    Array.isArray(
+      retry
+    )
+  ) {
+    throw new Error(
+      `${source} retry must be an object or false.`
+    );
+  }
+
+  if (
+    retry.maxAttempts !==
+      undefined &&
+    (
+      !Number.isInteger(
+        retry.maxAttempts
+      ) ||
+      retry.maxAttempts <
+        1
+    )
+  ) {
+    throw new Error(
+      `${source} retry.maxAttempts must be a positive integer.`
+    );
+  }
+
+  if (
+    retry.delayMs !==
+      undefined &&
+    (
+      typeof retry.delayMs !==
+        'number' ||
+      !Number.isFinite(
+        retry.delayMs
+      ) ||
+      retry.delayMs <
+        0
+    )
+  ) {
+    throw new Error(
+      `${source} retry.delayMs must be a non-negative finite number.`
+    );
+  }
+
+  if (
+    retry.statuses !==
+      undefined &&
+    (
+      !Array.isArray(
+        retry.statuses
+      ) ||
+      retry.statuses.some(
+        (status) =>
+          !validHttpStatus(
+            status
+          )
+      )
+    )
+  ) {
+    throw new Error(
+      `${source} retry.statuses must be an array of HTTP statuses.`
+    );
+  }
+
+  if (
+    retry.retryActions !==
+      undefined &&
+    typeof retry.retryActions !==
+      'boolean'
+  ) {
+    throw new Error(
+      `${source} retry.retryActions must be a boolean.`
     );
   }
 }
@@ -236,6 +441,27 @@ export async function loadConfig(
   }
 
   if (
+    config.concurrency !==
+      undefined &&
+    (
+      !Number.isInteger(
+        config.concurrency
+      ) ||
+      config.concurrency <
+        1
+    )
+  ) {
+    throw new Error(
+      `${path} concurrency must be a positive integer.`
+    );
+  }
+
+  validateRetry(
+    config.retries,
+    `${path} retries`
+  );
+
+  if (
     config.coverage?.openapi !== undefined &&
     typeof config.coverage.openapi !== 'string'
   ) {
@@ -301,19 +527,27 @@ export async function loadConfig(
     const route
     of config.routes ?? []
   ) {
+    const source =
+      `${path} route ${route.name ?? route.path}`;
+
     validateRedirect(
       route,
-      `${path} route ${route.name ?? route.path}`
+      source
     );
 
     validateTags(
       route.tags,
-      `${path} route ${route.name ?? route.path}`
+      source
     );
 
     validateExpectation(
       route,
-      `${path} route ${route.name ?? route.path}`
+      source
+    );
+
+    validateRetry(
+      route.retry,
+      source
     );
   }
 
@@ -359,14 +593,22 @@ export async function loadConfig(
       const step
       of scenario.steps
     ) {
+      const source =
+        `${path} scenario ${scenario.name} > ${step.name ?? step.path}`;
+
       validateRedirect(
         step,
-        `${path} scenario ${scenario.name} > ${step.name ?? step.path}`
+        source
       );
 
       validateExpectation(
         step,
-        `${path} scenario ${scenario.name} > ${step.name ?? step.path}`
+        source
+      );
+
+      validateRetry(
+        step.retry,
+        source
       );
 
       for (

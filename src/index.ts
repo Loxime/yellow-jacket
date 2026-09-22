@@ -89,6 +89,7 @@ export type {
   DoctorReport,
   HttpMethod,
   Regression,
+  RetryConfig,
   ResponseSnapshot,
   RouteDefinition,
   RouteExpectation,
