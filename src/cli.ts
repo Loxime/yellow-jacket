@@ -64,6 +64,8 @@ import {
   formatCoverageMarkdown,
   formatRunGitHub,
   formatRunGitLab,
+  formatRunHtml,
+  formatRunJson,
   formatRunMarkdown
 } from './core/report.js';
 
@@ -84,6 +86,10 @@ Usage:
   yellow-jacket doctor
   yellow-jacket doctor --json
   yellow-jacket run [--allow-actions]
+  yellow-jacket run --json
+  yellow-jacket run --markdown
+  yellow-jacket run --html
+  yellow-jacket run --html --output yellow-jacket-run.html
   yellow-jacket run --github
   yellow-jacket run --gitlab --output yellow-jacket-run.xml
   yellow-jacket baseline [--allow-actions]
@@ -401,7 +407,7 @@ async function main():
     return;
   }
 
-  const coverageOutputFormats =
+  const outputFormats =
     [
       values.json,
       values.markdown,
@@ -413,7 +419,7 @@ async function main():
     ).length;
 
   if (
-    coverageOutputFormats > 1
+    outputFormats > 1
   ) {
     console.error(
       '--json, --markdown, --html, --github and --gitlab cannot be used together.'
@@ -426,10 +432,11 @@ async function main():
   if (
     values.json &&
     command !== 'coverage' &&
+    command !== 'run' &&
     command !== 'doctor'
   ) {
     console.error(
-      '--json is only supported by coverage and doctor.'
+      '--json is only supported by coverage, run and doctor.'
     );
 
     process.exitCode = 2;
@@ -438,10 +445,11 @@ async function main():
 
   if (
     values.markdown &&
-    command !== 'coverage'
+    command !== 'coverage' &&
+    command !== 'run'
   ) {
     console.error(
-      '--markdown is only supported by the coverage command.'
+      '--markdown is only supported by coverage and run.'
     );
 
     process.exitCode = 2;
@@ -450,10 +458,11 @@ async function main():
 
   if (
     values.html &&
-    command !== 'coverage'
+    command !== 'coverage' &&
+    command !== 'run'
   ) {
     console.error(
-      '--html is only supported by the coverage command.'
+      '--html is only supported by coverage and run.'
     );
 
     process.exitCode = 2;
@@ -501,21 +510,7 @@ async function main():
 
   if (
     values.output &&
-    command === 'run' &&
-    !values.github &&
-    !values.gitlab
-  ) {
-    console.error(
-      '--output with run requires --github or --gitlab.'
-    );
-
-    process.exitCode = 2;
-    return;
-  }
-
-  if (
-    values.output &&
-    coverageOutputFormats === 0
+    outputFormats === 0
   ) {
     console.error(
       '--output requires --json, --markdown, --html, --github or --gitlab.'
@@ -815,6 +810,9 @@ async function main():
   const structuredRunOutput =
     command === 'run' &&
     (
+      values.json ||
+      values.markdown ||
+      values.html ||
       values.github ||
       values.gitlab
     );
@@ -934,13 +932,26 @@ async function main():
     structuredRunOutput
   ) {
     const rendered =
-      values.github
-        ? formatRunGitHub(
-            runReport
+      values.json
+        ? formatRunJson(
+            runReport,
+            config.compare
           )
-        : formatRunGitLab(
-            runReport
-          );
+        : values.markdown
+          ? formatRunMarkdown(
+              runReport
+            )
+          : values.html
+            ? formatRunHtml(
+                runReport
+              )
+            : values.github
+              ? formatRunGitHub(
+                  runReport
+                )
+              : formatRunGitLab(
+                  runReport
+                );
 
     if (
       values.github &&

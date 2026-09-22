@@ -8,6 +8,8 @@ import {
   formatCoverageMarkdown,
   formatRunGitHub,
   formatRunGitLab,
+  formatRunHtml,
+  formatRunJson,
   formatRunMarkdown
 } from '../src/core/report.js';
 
@@ -412,6 +414,151 @@ test(
     assert.match(
       output,
       /status 200 -&gt; 500/
+    );
+  }
+);
+
+test(
+  'formats an HTTP run as redacted JSON',
+  () => {
+    const report:
+      RunReport = {
+        baselineFound:
+          false,
+        passed:
+          true,
+
+        results: [
+          {
+            route:
+              'session',
+            method:
+              'GET',
+            url:
+              'http://localhost/session',
+            status:
+              200,
+            contentType:
+              'application/json',
+            body: {
+              ok:
+                true,
+              token:
+                'super-secret'
+            },
+            durationMs:
+              5,
+            passed:
+              true
+          }
+        ],
+
+        regressions:
+          []
+      };
+
+    const output =
+      formatRunJson(
+        report,
+        {
+          redact: [
+            '$.token'
+          ]
+        }
+      );
+
+    assert.equal(
+      output.includes(
+        'super-secret'
+      ),
+      false
+    );
+
+    const parsed =
+      JSON.parse(
+        output
+      ) as RunReport;
+
+    assert.deepEqual(
+      parsed.results[0]
+        ?.body,
+      {
+        ok:
+          true,
+        token:
+          '[REDACTED]'
+      }
+    );
+  }
+);
+
+test(
+  'formats an HTTP run as safe standalone HTML',
+  () => {
+    const report:
+      RunReport = {
+        baselineFound:
+          true,
+        passed:
+          false,
+
+        results: [
+          {
+            route:
+              'users <script>',
+            method:
+              'GET',
+            url:
+              'http://localhost/users',
+            status:
+              500,
+            contentType:
+              'text/plain',
+            body:
+              null,
+            durationMs:
+              12,
+            passed:
+              false,
+            error:
+              'bad <response> & failure'
+          }
+        ],
+
+        regressions:
+          []
+      };
+
+    const html =
+      formatRunHtml(
+        report
+      );
+
+    assert.match(
+      html,
+      /^<!doctype html>/
+    );
+
+    assert.match(
+      html,
+      /<title>Yellow Jacket run<\/title>/
+    );
+
+    assert.match(
+      html,
+      /users &lt;script&gt;/
+    );
+
+    assert.match(
+      html,
+      /bad &lt;response&gt; &amp; failure/
+    );
+
+    assert.equal(
+      html.includes(
+        'users <script>'
+      ),
+      false
     );
   }
 );

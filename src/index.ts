@@ -51,6 +51,8 @@ export {
   formatCoverageMarkdown,
   formatRunGitHub,
   formatRunGitLab,
+  formatRunHtml,
+  formatRunJson,
   formatRunMarkdown
 } from './core/report.js';
 

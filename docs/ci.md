@@ -81,6 +81,41 @@ gate fails.
 
 ## HTTP regression reporting
 
+HTTP runs support the same generic report formats as coverage.
+
+JSON:
+
+```bash
+yellow-jacket run \
+  --json \
+  --output yellow-jacket-run.json
+```
+
+Markdown:
+
+```bash
+yellow-jacket run \
+  --markdown \
+  --output yellow-jacket-run.md
+```
+
+Static HTML:
+
+```bash
+yellow-jacket run \
+  --html \
+  --output yellow-jacket-run.html
+```
+
+The JSON report contains the run result, individual request results and
+detected regressions.
+
+Configured `compare.ignore` and `compare.redact` rules are applied to response
+bodies before JSON output is serialized, so values configured for redaction
+are not exposed by the report.
+
+All formats preserve the normal `run` exit code.
+
 The native CI formats also work with the main regression runner.
 
 GitHub Actions:

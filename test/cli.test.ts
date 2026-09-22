@@ -238,7 +238,7 @@ test(
 );
 
 test(
-  '--json is rejected outside coverage and doctor',
+  '--json is rejected outside coverage, run and doctor',
   async (t) => {
     const directory =
       await mkdtemp(
@@ -263,7 +263,7 @@ test(
     const result =
       await runCli(
         [
-          'run',
+          'baseline',
           '--json'
         ],
         directory
@@ -276,7 +276,7 @@ test(
 
     assert.match(
       result.stderr,
-      /--json is only supported by coverage and doctor/
+      /--json is only supported by coverage, run and doctor/
     );
   }
 );
@@ -610,7 +610,7 @@ test(
 );
 
 test(
-  '--html is rejected outside the coverage command',
+  '--html is rejected outside coverage and run',
   async (t) => {
     const directory =
       await mkdtemp(
@@ -635,7 +635,7 @@ test(
     const result =
       await runCli(
         [
-          'run',
+          'baseline',
           '--html'
         ],
         directory
@@ -648,7 +648,7 @@ test(
 
     assert.match(
       result.stderr,
-      /--html is only supported by the coverage command/
+      /--html is only supported by coverage and run/
     );
   }
 );
@@ -2036,6 +2036,236 @@ test(
     assert.match(
       result.stderr,
       /expect\.maxDurationMs must be a positive finite number/
+    );
+  }
+);
+
+test(
+  'run emits JSON and Markdown reports',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-run-generic-reports-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'https://api.example.test',
+  routes: [
+    {
+      name: 'create user',
+      method: 'POST',
+      path: '/users'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const jsonResult =
+      await runCli(
+        [
+          'run',
+          '--json'
+        ],
+        directory
+      );
+
+    assert.equal(
+      jsonResult.code,
+      1
+    );
+
+    assert.equal(
+      jsonResult.stderr,
+      ''
+    );
+
+    const report =
+      JSON.parse(
+        jsonResult.stdout
+      ) as {
+        baselineFound:
+          boolean;
+        passed:
+          boolean;
+        results:
+          Array<{
+            route:
+              string;
+            passed:
+              boolean;
+          }>;
+      };
+
+    assert.equal(
+      report.baselineFound,
+      false
+    );
+
+    assert.equal(
+      report.passed,
+      false
+    );
+
+    assert.equal(
+      report.results[0]
+        ?.route,
+      'create user'
+    );
+
+    assert.equal(
+      report.results[0]
+        ?.passed,
+      false
+    );
+
+    const markdownResult =
+      await runCli(
+        [
+          'run',
+          '--markdown'
+        ],
+        directory
+      );
+
+    assert.equal(
+      markdownResult.code,
+      1
+    );
+
+    assert.equal(
+      markdownResult.stderr,
+      ''
+    );
+
+    assert.match(
+      markdownResult.stdout,
+      /## 🐝 Yellow Jacket run/
+    );
+
+    assert.match(
+      markdownResult.stdout,
+      /create user/
+    );
+  }
+);
+
+test(
+  'run writes a standalone HTML report to output',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-run-html-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'https://api.example.test',
+  routes: [
+    {
+      name: 'create user',
+      method: 'POST',
+      path: '/users'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'run',
+          '--html',
+          '--output',
+          'reports/run.html'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.equal(
+      result.stderr,
+      ''
+    );
+
+    assert.match(
+      result.stdout,
+      /Run report written to/
+    );
+
+    const html =
+      await readFile(
+        join(
+          directory,
+          'reports',
+          'run.html'
+        ),
+        'utf8'
+      );
+
+    assert.match(
+      html,
+      /^<!doctype html>/
+    );
+
+    assert.match(
+      html,
+      /<title>Yellow Jacket run<\/title>/
+    );
+
+    assert.match(
+      html,
+      /create user/
     );
   }
 );

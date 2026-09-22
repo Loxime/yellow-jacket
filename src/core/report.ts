@@ -1,4 +1,9 @@
+import {
+  normalizeBody
+} from './normalize.js';
+
 import type {
+  CompareConfig,
   CoverageReport,
   Regression,
   RunReport
@@ -714,6 +719,407 @@ export function formatRunMarkdown(
   }
 
   return `${lines.join('\n')}\n`;
+}
+
+export function formatRunJson(
+  report: RunReport,
+  compare: CompareConfig = {}
+): string {
+  const safeReport:
+    RunReport = {
+      ...report,
+
+      results:
+        report.results.map(
+          (result) => ({
+            ...result,
+
+            body:
+              normalizeBody(
+                result.body,
+                compare
+              )
+          })
+        )
+    };
+
+  return `${JSON.stringify(
+    safeReport,
+    null,
+    2
+  )}\n`;
+}
+
+export function formatRunHtml(
+  report: RunReport
+): string {
+  const failedAssertions =
+    report.results.filter(
+      (result) =>
+        !result.passed
+    );
+
+  const resultRows =
+    report.results
+      .map(
+        (result) => `
+        <tr>
+          <td>
+            <code>${escapeHtml(
+              result.method
+            )}</code>
+          </td>
+          <td>
+            <code>${escapeHtml(
+              result.route
+            )}</code>
+          </td>
+          <td>
+            ${result.status}
+          </td>
+          <td>
+            ${result.durationMs}ms
+          </td>
+          <td>
+            <span class="status ${
+              result.passed
+                ? 'passed'
+                : 'failed'
+            }">
+              ${
+                result.passed
+                  ? 'Passed'
+                  : 'Failed'
+              }
+            </span>
+            ${
+              result.error
+                ? `<div class="detail">${escapeHtml(
+                    result.error
+                  )}</div>`
+                : ''
+            }
+          </td>
+        </tr>`
+      )
+      .join('');
+
+  const regressions =
+    report.regressions.length ===
+      0
+      ? `
+        <p class="empty">
+          No baseline regressions detected.
+        </p>`
+      : `
+        <ul class="regressions">
+          ${report.regressions
+            .map(
+              (regression) => `
+            <li>
+              <strong>
+                <code>${escapeHtml(
+                  `${regression.method} ${regression.route}`
+                )}</code>
+              </strong>
+
+              <ul>
+                ${regressionDetails(
+                  regression
+                )
+                  .map(
+                    (detail) =>
+                      `<li>${escapeHtml(
+                        detail
+                      )}</li>`
+                  )
+                  .join('')}
+              </ul>
+            </li>`
+            )
+            .join('')}
+        </ul>`;
+
+  const baseline =
+    report.baselineFound
+      ? 'Loaded'
+      : 'Not found';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <title>Yellow Jacket run</title>
+
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: Canvas;
+      color: CanvasText;
+    }
+
+    main {
+      width: min(
+        1100px,
+        calc(100% - 32px)
+      );
+      margin: 48px auto;
+    }
+
+    h1,
+    h2 {
+      margin-bottom: 8px;
+    }
+
+    .subtitle,
+    .empty {
+      opacity: 0.7;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns:
+        repeat(
+          auto-fit,
+          minmax(150px, 1fr)
+        );
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .metric {
+      border:
+        1px solid
+        color-mix(
+          in srgb,
+          CanvasText 18%,
+          transparent
+        );
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .metric span {
+      display: block;
+      font-size: 0.8rem;
+      opacity: 0.68;
+      margin-bottom: 6px;
+    }
+
+    .metric strong {
+      font-size: 1.4rem;
+    }
+
+    .summary {
+      border: 1px solid;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 28px;
+      font-weight: 600;
+    }
+
+    .summary.passed {
+      border-color: #299764;
+    }
+
+    .summary.failed {
+      border-color: #c43b3b;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      border:
+        1px solid
+        color-mix(
+          in srgb,
+          CanvasText 18%,
+          transparent
+        );
+      border-radius: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom:
+        1px solid
+        color-mix(
+          in srgb,
+          CanvasText 12%,
+          transparent
+        );
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    th {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
+    code {
+      font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        monospace;
+    }
+
+    .status {
+      font-weight: 600;
+    }
+
+    .passed {
+      color: #299764;
+    }
+
+    .failed {
+      color: #c43b3b;
+    }
+
+    .detail {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      opacity: 0.75;
+    }
+
+    section {
+      margin-top: 32px;
+    }
+
+    .regressions > li {
+      margin-bottom: 16px;
+    }
+
+    footer {
+      margin-top: 32px;
+      font-size: 0.85rem;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <header>
+      <h1>🐝 Yellow Jacket run</h1>
+
+      <p class="subtitle">
+        HTTP regression report
+      </p>
+    </header>
+
+    <section class="metrics">
+      <div class="metric">
+        <span>Requests</span>
+        <strong>${report.results.length}</strong>
+      </div>
+
+      <div class="metric">
+        <span>Failed assertions</span>
+        <strong>${failedAssertions.length}</strong>
+      </div>
+
+      <div class="metric">
+        <span>Regressions</span>
+        <strong>${report.regressions.length}</strong>
+      </div>
+
+      <div class="metric">
+        <span>Baseline</span>
+        <strong>${escapeHtml(
+          baseline
+        )}</strong>
+      </div>
+    </section>
+
+    <div class="summary ${
+      report.passed
+        ? 'passed'
+        : 'failed'
+    }">
+      ${
+        report.passed
+          ? 'Run passed'
+          : 'Run failed'
+      }
+    </div>
+
+    <section>
+      <h2>Requests</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Route</th>
+              <th>Status</th>
+              <th>Duration</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${resultRows}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Regressions</h2>
+
+      ${regressions}
+    </section>
+
+    ${
+      report.baselineFound
+        ? ''
+        : `
+    <section>
+      <p>
+        No baseline found. Regression comparison was skipped.
+      </p>
+    </section>`
+    }
+
+    <footer>
+      Generated by Yellow Jacket
+    </footer>
+  </main>
+</body>
+</html>
+`;
 }
 
 export function formatRunGitHub(
