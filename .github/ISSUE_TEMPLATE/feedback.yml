@@ -1,0 +1,47 @@
+name: User feedback
+description: Share friction, usability feedback or documentation feedback.
+title: "[feedback] "
+body:
+  - type: dropdown
+    id: context
+    attributes:
+      label: Where did you use Yellow Jacket?
+      options:
+        - Local development
+        - Git pre-push hook
+        - GitHub Actions
+        - GitLab CI
+        - Another CI system
+        - Documentation / evaluation only
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: What were you trying to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: friction
+    attributes:
+      label: What was confusing, slow or difficult?
+    validations:
+      required: true
+
+  - type: textarea
+    id: useful
+    attributes:
+      label: What worked well?
+
+  - type: textarea
+    id: improvement
+    attributes:
+      label: What would improve the experience most?
+
+  - type: input
+    id: version
+    attributes:
+      label: Yellow Jacket version
+      placeholder: "0.2.0"

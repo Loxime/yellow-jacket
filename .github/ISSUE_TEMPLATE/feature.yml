@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest an improvement or new Yellow Jacket capability.
+title: "[feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What developer workflow or limitation are you trying to improve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe what you would like Yellow Jacket to do.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - HTTP runner
+        - Baselines and diffs
+        - Scenarios
+        - Coverage
+        - Git hooks
+        - GitHub Actions
+        - GitLab CI
+        - Reports
+        - CLI
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: Show an example command or configuration if useful.
+      render: javascript
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

@@ -829,6 +829,18 @@ Full documentation:
 
 https://loxime.github.io/yellow-jacket/
 
+## Feedback and contributing
+
+Bug reports, feature requests and general usage feedback are welcome.
+
+GitHub provides dedicated issue forms for bugs, feature requests and user
+feedback. Equivalent issue templates are also included for the GitLab mirror.
+
+Please remove tokens, credentials and private response data before sharing logs
+or configuration.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and reporting guidance.
+
 ## Development
 
 ```bash

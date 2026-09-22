@@ -2,6 +2,14 @@
 
 All notable changes to Yellow Jacket are documented in this file.
 
+## Unreleased
+
+### Community
+
+- GitHub bug, feature and user-feedback issue forms
+- GitLab bug, feature and user-feedback issue templates
+- contribution and responsible bug-reporting guidance
+
 ## 0.2.0
 
 ### Request resilience

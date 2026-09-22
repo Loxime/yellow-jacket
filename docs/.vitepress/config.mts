@@ -81,6 +81,12 @@ export default defineConfig({
               'Doctor',
             link:
               '/doctor'
+          },
+          {
+            text:
+              'Feedback & contributing',
+            link:
+              '/contributing'
           }
         ]
       },
