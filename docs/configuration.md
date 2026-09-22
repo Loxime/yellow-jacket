@@ -280,6 +280,104 @@ This avoids treating small timing variations between runs as regressions.
 Content type and duration expectation failures are also included automatically
 in native GitHub Actions and GitLab reports.
 
+## Response header expectations
+
+Routes and scenario steps can assert exact response header values:
+
+```js
+expect: {
+  headers: {
+    'x-api-version':
+      '2',
+
+    'cache-control': [
+      'no-cache',
+      'no-store'
+    ]
+  }
+}
+```
+
+Header names are case-insensitive.
+
+These are explicit expectations and are separate from `compare.headers`.
+Expected headers do not need to be persisted in the baseline.
+
+## Retries
+
+Retries are disabled by default because the default `maxAttempts` is `1`.
+
+Configure safe-request retries globally:
+
+```js
+retries: {
+  maxAttempts:
+    3,
+
+  delayMs:
+    100,
+
+  statuses: [
+    408,
+    425,
+    429,
+    500,
+    502,
+    503,
+    504
+  ]
+}
+```
+
+A retry can occur after a network error or one of the configured statuses.
+
+A status explicitly accepted by `expect.status` is not retried.
+
+POST, PUT, PATCH and DELETE are never retried unless `retryActions` is
+explicitly enabled:
+
+```js
+{
+  method:
+    'POST',
+
+  path:
+    '/jobs',
+
+  retry: {
+    maxAttempts:
+      2,
+
+    retryActions:
+      true
+  }
+}
+```
+
+A route or scenario step can disable inherited retries:
+
+```js
+retry:
+  false
+```
+
+## Concurrency
+
+Top-level routes run sequentially by default.
+
+Set a bounded concurrency:
+
+```js
+concurrency:
+  4
+```
+
+Yellow Jacket preserves result order even when requests complete in a different
+order.
+
+Scenarios remain sequential and are executed after the independent route set.
+Scenario steps are never parallelized.
+
 ## Ignore dynamic values
 
 Values that legitimately change between requests can be ignored:

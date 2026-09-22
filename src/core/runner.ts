@@ -8,6 +8,7 @@ import {
 
 import type {
   HttpMethod,
+  RetryConfig,
   RouteDefinition,
   RouteRunResult,
   RunOptions,
@@ -23,6 +24,23 @@ const ACTION_METHODS:
       'DELETE'
     ]);
 
+const DEFAULT_RETRY_STATUSES =
+  [
+    408,
+    425,
+    429,
+    500,
+    502,
+    503,
+    504
+  ] as const;
+
+interface EffectiveRetryConfig {
+  maxAttempts: number;
+  delayMs: number;
+  statuses: ReadonlySet<number>;
+}
+
 function expectedStatusMatches(
   route: RouteDefinition,
   status: number
@@ -30,13 +48,21 @@ function expectedStatusMatches(
   const expected =
     route.expect?.status;
 
-  if (expected === undefined) {
+  if (
+    expected ===
+      undefined
+  ) {
     return true;
   }
 
-  return Array.isArray(expected)
-    ? expected.includes(status)
-    : expected === status;
+  return Array.isArray(
+    expected
+  )
+    ? expected.includes(
+        status
+      )
+    : expected ===
+        status;
 }
 
 function normalizeContentType(
@@ -72,7 +98,7 @@ function expectedContentTypeMatches(
 
   if (
     expected ===
-    undefined
+      undefined
   ) {
     return true;
   }
@@ -100,18 +126,92 @@ function expectedContentTypeMatches(
   );
 }
 
+function expectedHeaderErrors(
+  route: RouteDefinition,
+  headers: Headers
+): string[] {
+  const errors:
+    string[] = [];
+
+  for (
+    const [
+      rawName,
+      expected
+    ]
+    of Object.entries(
+      route.expect
+        ?.headers ??
+        {}
+    )
+  ) {
+    const name =
+      rawName
+        .trim()
+        .toLowerCase();
+
+    const values =
+      Array.isArray(
+        expected
+      )
+        ? expected
+        : [
+            expected
+          ];
+
+    const actual =
+      headers.get(
+        name
+      );
+
+    if (
+      actual ===
+        null ||
+      !values.includes(
+        actual
+      )
+    ) {
+      errors.push(
+        `Expected header ${name} ${values
+          .map(
+            (value) =>
+              JSON.stringify(
+                value
+              )
+          )
+          .join(
+            ' or '
+          )}, received ${
+          actual ===
+            null
+            ? 'null'
+            : JSON.stringify(
+                actual
+              )
+        }.`
+      );
+    }
+  }
+
+  return errors;
+}
+
 function parseBody(
   text: string,
   contentType: string | null
 ): unknown {
-  if (text.length === 0) {
+  if (
+    text.length ===
+      0
+  ) {
     return null;
   }
 
   if (
     contentType
       ?.toLowerCase()
-      .includes('json')
+      .includes(
+        'json'
+      )
   ) {
     try {
       return JSON.parse(
@@ -139,11 +239,18 @@ function normalizeHostname(
   let value =
     hostname
       .toLowerCase()
-      .replace(/\.$/, '');
+      .replace(
+        /\.$/,
+        ''
+      );
 
   if (
-    value.startsWith('[') &&
-    value.endsWith(']')
+    value.startsWith(
+      '['
+    ) &&
+    value.endsWith(
+      ']'
+    )
   ) {
     value =
       value.slice(
@@ -159,11 +266,15 @@ function isLoopbackIpv4(
   hostname: string
 ): boolean {
   const parts =
-    hostname.split('.');
+    hostname.split(
+      '.'
+    );
 
   if (
-    parts.length !== 4 ||
-    parts[0] !== '127'
+    parts.length !==
+      4 ||
+    parts[0] !==
+      '127'
   ) {
     return false;
   }
@@ -179,11 +290,15 @@ function isLoopbackIpv4(
       }
 
       const value =
-        Number(part);
+        Number(
+          part
+        );
 
       return (
-        value >= 0 &&
-        value <= 255
+        value >=
+          0 &&
+        value <=
+          255
       );
     }
   );
@@ -193,9 +308,12 @@ export function isSafeActionTarget(
   input: string | URL
 ): boolean {
   const url =
-    input instanceof URL
+    input instanceof
+      URL
       ? input
-      : new URL(input);
+      : new URL(
+          input
+        );
 
   const hostname =
     normalizeHostname(
@@ -203,7 +321,8 @@ export function isSafeActionTarget(
     );
 
   return (
-    hostname === 'localhost' ||
+    hostname ===
+      'localhost' ||
     hostname.endsWith(
       '.localhost'
     ) ||
@@ -213,7 +332,8 @@ export function isSafeActionTarget(
     isLoopbackIpv4(
       hostname
     ) ||
-    hostname === '::1' ||
+    hostname ===
+      '::1' ||
     hostname ===
       '0:0:0:0:0:0:0:1'
   );
@@ -227,14 +347,18 @@ function comparedResponseHeaderNames(
 
   for (
     const name
-    of config.compare?.headers ?? []
+    of config.compare
+      ?.headers ??
+      []
   ) {
     const normalized =
       name
         .trim()
         .toLowerCase();
 
-    if (normalized) {
+    if (
+      normalized
+    ) {
       names.add(
         normalized
       );
@@ -242,7 +366,8 @@ function comparedResponseHeaderNames(
   }
 
   if (
-    config.compare?.redirects
+    config.compare
+      ?.redirects
   ) {
     names.add(
       'location'
@@ -257,7 +382,10 @@ function comparedResponseHeaderNames(
 function captureResponseHeaders(
   config: YellowJacketConfig,
   response: Response
-): Record<string, string | null> {
+): Record<
+  string,
+  string | null
+> {
   const captured:
     Record<
       string,
@@ -287,8 +415,174 @@ function durationSince(
       (
         performance.now() -
         startedAt
-      ) * 100
-    ) / 100
+      ) *
+        100
+    ) /
+    100
+  );
+}
+
+function positiveAttemptCount(
+  value: number | undefined
+): number {
+  return (
+    value !==
+      undefined &&
+    Number.isInteger(
+      value
+    ) &&
+    value >=
+      1
+  )
+    ? value
+    : 1;
+}
+
+function nonNegativeDelay(
+  value: number | undefined
+): number {
+  return (
+    value !==
+      undefined &&
+    Number.isFinite(
+      value
+    ) &&
+    value >=
+      0
+  )
+    ? value
+    : 0;
+}
+
+function effectiveRetryConfig(
+  config: YellowJacketConfig,
+  route: RouteDefinition,
+  method: HttpMethod
+): EffectiveRetryConfig {
+  if (
+    route.retry ===
+      false
+  ) {
+    return {
+      maxAttempts:
+        1,
+      delayMs:
+        0,
+      statuses:
+        new Set()
+    };
+  }
+
+  const globalRetry:
+    RetryConfig =
+      config.retries ??
+      {};
+
+  const routeRetry:
+    RetryConfig =
+      route.retry ??
+      {};
+
+  const retryActions =
+    routeRetry.retryActions ??
+    globalRetry.retryActions ??
+    false;
+
+  const mayRetry =
+    !isActionMethod(
+      method
+    ) ||
+    retryActions;
+
+  const maxAttempts =
+    mayRetry
+      ? positiveAttemptCount(
+          routeRetry.maxAttempts ??
+          globalRetry.maxAttempts
+        )
+      : 1;
+
+  const delayMs =
+    nonNegativeDelay(
+      routeRetry.delayMs ??
+      globalRetry.delayMs
+    );
+
+  const statuses =
+    new Set<number>(
+      routeRetry.statuses ??
+      globalRetry.statuses ??
+      DEFAULT_RETRY_STATUSES
+    );
+
+  return {
+    maxAttempts,
+    delayMs,
+    statuses
+  };
+}
+
+async function wait(
+  delayMs: number
+): Promise<void> {
+  if (
+    delayMs <=
+      0
+  ) {
+    return;
+  }
+
+  await new Promise<void>(
+    (resolvePromise) => {
+      setTimeout(
+        resolvePromise,
+        delayMs
+      );
+    }
+  );
+}
+
+function explicitlyAcceptsStatus(
+  route: RouteDefinition,
+  status: number
+): boolean {
+  const expected =
+    route.expect
+      ?.status;
+
+  if (
+    expected ===
+      undefined
+  ) {
+    return false;
+  }
+
+  return Array.isArray(
+    expected
+  )
+    ? expected.includes(
+        status
+      )
+    : expected ===
+        status;
+}
+
+function shouldRetryStatus(
+  route: RouteDefinition,
+  status: number,
+  attempt: number,
+  retry: EffectiveRetryConfig
+): boolean {
+  return (
+    attempt <
+      retry.maxAttempts &&
+    retry.statuses.has(
+      status
+    ) &&
+    !explicitlyAcceptsStatus(
+      route,
+      status
+    )
   );
 }
 
@@ -299,7 +593,8 @@ export async function runRoute(
 ): Promise<RouteRunResult> {
   const method:
     HttpMethod =
-      route.method ?? 'GET';
+      route.method ??
+      'GET';
 
   const target =
     new URL(
@@ -314,7 +609,9 @@ export async function runRoute(
     performance.now();
 
   if (
-    isActionMethod(method) &&
+    isActionMethod(
+      method
+    ) &&
     !options.allowActions &&
     !isSafeActionTarget(
       target
@@ -326,14 +623,18 @@ export async function runRoute(
         route.path,
       method,
       url,
-      status: 0,
-      contentType: null,
-      body: null,
+      status:
+        0,
+      contentType:
+        null,
+      body:
+        null,
       durationMs:
         durationSince(
           startedAt
         ),
-      passed: false,
+      passed:
+        false,
       error:
         `Blocked ${method} request to ${target.host}. Mutating requests are allowed only for local targets by default. Re-run with --allow-actions to override.`
     };
@@ -345,9 +646,13 @@ export async function runRoute(
     );
 
   for (
-    const [name, value]
+    const [
+      name,
+      value
+    ]
     of Object.entries(
-      route.headers ?? {}
+      route.headers ??
+      {}
     )
   ) {
     headers.set(
@@ -360,7 +665,8 @@ export async function runRoute(
     BodyInit | undefined;
 
   if (
-    route.body !== undefined
+    route.body !==
+      undefined
   ) {
     if (
       typeof route.body ===
@@ -395,186 +701,365 @@ export async function runRoute(
     }
   }
 
-  try {
-    const requestInit:
-      RequestInit = {
-        method,
-        headers,
-        redirect:
-          route.redirect ??
-          'follow',
-        signal:
-          AbortSignal.timeout(
-            config.timeoutMs ??
-              10_000
-          )
-      };
+  const retry =
+    effectiveRetryConfig(
+      config,
+      route,
+      method
+    );
 
-    if (
-      body !== undefined
-    ) {
-      requestInit.body =
-        body;
-    }
-
-    const response =
-      await fetch(
-        url,
-        requestInit
-      );
-
-    const text =
-      await response.text();
-
-    const contentType =
-      response.headers.get(
-        'content-type'
-      );
-
-    const durationMs =
-      durationSince(
-        startedAt
-      );
-
-    const statusMatches =
-      expectedStatusMatches(
-        route,
-        response.status
-      );
-
-    const contentTypeMatches =
-      expectedContentTypeMatches(
-        route,
-        contentType
-      );
-
-    const errors:
-      string[] = [];
-
-    if (
-      !statusMatches
-    ) {
-      errors.push(
-        `Expected status ${String(
-          route.expect?.status
-        )}, received ${response.status}.`
-      );
-    }
-
-    if (
-      !contentTypeMatches
-    ) {
-      const expected =
-        route.expect
-          ?.contentType;
-
-      const label =
-        Array.isArray(
-          expected
-        )
-          ? expected.join(
-              ' or '
+  for (
+    let attempt = 1;
+    attempt <=
+      retry.maxAttempts;
+    attempt +=
+      1
+  ) {
+    try {
+      const requestInit:
+        RequestInit = {
+          method,
+          headers,
+          redirect:
+            route.redirect ??
+            'follow',
+          signal:
+            AbortSignal.timeout(
+              config.timeoutMs ??
+                10_000
             )
-          : String(
-              expected
-            );
+        };
 
-      errors.push(
-        `Expected content-type ${label}, received ${String(
-          normalizeContentType(
-            contentType
-          )
-        )}.`
-      );
-    }
+      if (
+        body !==
+          undefined
+      ) {
+        requestInit.body =
+          body;
+      }
 
-    const maxDurationMs =
-      route.expect
-        ?.maxDurationMs;
+      const response =
+        await fetch(
+          url,
+          requestInit
+        );
 
-    if (
-      maxDurationMs !==
-        undefined &&
-      durationMs >
-        maxDurationMs
-    ) {
-      errors.push(
-        `Expected response within ${maxDurationMs}ms, received ${durationMs}ms.`
-      );
-    }
+      const text =
+        await response.text();
 
-    const responseHeaders =
-      captureResponseHeaders(
-        config,
-        response
-      );
+      if (
+        shouldRetryStatus(
+          route,
+          response.status,
+          attempt,
+          retry
+        )
+      ) {
+        await wait(
+          retry.delayMs
+        );
 
-    return {
-      route:
-        route.name ??
-        route.path,
-      method,
-      url,
-      status:
-        response.status,
-      contentType,
-      body:
-        parseBody(
-          text,
-          contentType
-        ),
-      durationMs,
+        continue;
+      }
 
-      ...(Object.keys(
-        responseHeaders
-      ).length > 0
-        ? {
-            responseHeaders
-          }
-        : {}),
+      const contentType =
+        response.headers.get(
+          'content-type'
+        );
 
-      redirected:
-        response.redirected,
-
-      finalUrl:
-        response.url ||
-        url,
-
-      passed:
-        errors.length ===
-        0,
-
-      ...(errors.length ===
-        0
-        ? {}
-        : {
-            error:
-              errors.join(
-                ' '
-              )
-          })
-    };
-  } catch (error) {
-    return {
-      route:
-        route.name ??
-        route.path,
-      method,
-      url,
-      status: 0,
-      contentType: null,
-      body: null,
-      durationMs:
+      const durationMs =
         durationSince(
           startedAt
-        ),
-      passed: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : String(error)
-    };
+        );
+
+      const statusMatches =
+        expectedStatusMatches(
+          route,
+          response.status
+        );
+
+      const contentTypeMatches =
+        expectedContentTypeMatches(
+          route,
+          contentType
+        );
+
+      const errors:
+        string[] = [];
+
+      if (
+        !statusMatches
+      ) {
+        errors.push(
+          `Expected status ${String(
+            route.expect
+              ?.status
+          )}, received ${response.status}.`
+        );
+      }
+
+      if (
+        !contentTypeMatches
+      ) {
+        const expected =
+          route.expect
+            ?.contentType;
+
+        const label =
+          Array.isArray(
+            expected
+          )
+            ? expected.join(
+                ' or '
+              )
+            : String(
+                expected
+              );
+
+        errors.push(
+          `Expected content-type ${label}, received ${String(
+            normalizeContentType(
+              contentType
+            )
+          )}.`
+        );
+      }
+
+      errors.push(
+        ...expectedHeaderErrors(
+          route,
+          response.headers
+        )
+      );
+
+      const maxDurationMs =
+        route.expect
+          ?.maxDurationMs;
+
+      if (
+        maxDurationMs !==
+          undefined &&
+        durationMs >
+          maxDurationMs
+      ) {
+        errors.push(
+          `Expected response within ${maxDurationMs}ms, received ${durationMs}ms.`
+        );
+      }
+
+      const responseHeaders =
+        captureResponseHeaders(
+          config,
+          response
+        );
+
+      return {
+        route:
+          route.name ??
+          route.path,
+        method,
+        url,
+        status:
+          response.status,
+        contentType,
+        body:
+          parseBody(
+            text,
+            contentType
+          ),
+        durationMs,
+
+        ...(Object.keys(
+          responseHeaders
+        ).length >
+          0
+          ? {
+              responseHeaders
+            }
+          : {}),
+
+        redirected:
+          response.redirected,
+
+        finalUrl:
+          response.url ||
+          url,
+
+        passed:
+          errors.length ===
+          0,
+
+        ...(errors.length ===
+          0
+          ? {}
+          : {
+              error:
+                errors.join(
+                  ' '
+                )
+            })
+      };
+    } catch (error) {
+      if (
+        attempt <
+          retry.maxAttempts
+      ) {
+        await wait(
+          retry.delayMs
+        );
+
+        continue;
+      }
+
+      return {
+        route:
+          route.name ??
+          route.path,
+        method,
+        url,
+        status:
+          0,
+        contentType:
+          null,
+        body:
+          null,
+        durationMs:
+          durationSince(
+            startedAt
+          ),
+        passed:
+          false,
+        error:
+          error instanceof
+            Error
+            ? error.message
+            : String(
+                error
+              )
+      };
+    }
   }
+
+  throw new Error(
+    'HTTP retry loop completed without a result.'
+  );
+}
+
+function effectiveConcurrency(
+  config: YellowJacketConfig
+): number {
+  return (
+    Number.isInteger(
+      config.concurrency
+    ) &&
+    (
+      config.concurrency ??
+      0
+    ) >
+      0
+  )
+    ? config.concurrency ??
+        1
+    : 1;
+}
+
+async function runIndependentRoutes(
+  config: YellowJacketConfig,
+  routes: RouteDefinition[],
+  options: RunOptions
+): Promise<RouteRunResult[]> {
+  if (
+    routes.length ===
+      0
+  ) {
+    return [];
+  }
+
+  const results:
+    Array<
+      RouteRunResult |
+      undefined
+    > =
+      new Array(
+        routes.length
+      );
+
+  let nextIndex =
+    0;
+
+  const worker =
+    async (): Promise<void> => {
+      while (
+        true
+      ) {
+        const index =
+          nextIndex;
+
+        nextIndex +=
+          1;
+
+        if (
+          index >=
+            routes.length
+        ) {
+          return;
+        }
+
+        const route =
+          routes[index];
+
+        if (
+          route ===
+            undefined
+        ) {
+          return;
+        }
+
+        results[index] =
+          await runRoute(
+            config,
+            route,
+            options
+          );
+      }
+    };
+
+  const workerCount =
+    Math.min(
+      effectiveConcurrency(
+        config
+      ),
+      routes.length
+    );
+
+  await Promise.all(
+    Array.from(
+      {
+        length:
+          workerCount
+      },
+      () =>
+        worker()
+    )
+  );
+
+  return results.map(
+    (
+      result,
+      index
+    ) => {
+      if (
+        result ===
+          undefined
+      ) {
+        throw new Error(
+          `Route ${index} did not produce a result.`
+        );
+      }
+
+      return result;
+    }
+  );
 }
 
 export async function runSuite(
@@ -590,22 +1075,25 @@ export async function runSuite(
       options.selection
     );
 
-  for (
-    const route
-    of selectedConfig.routes ?? []
-  ) {
-    results.push(
-      await runRoute(
-        selectedConfig,
-        route,
-        options
-      )
-    );
-  }
+  results.push(
+    ...await runIndependentRoutes(
+      selectedConfig,
+      selectedConfig.routes ??
+        [],
+      options
+    )
+  );
 
+  /*
+   * Scenarios deliberately remain sequential.
+   *
+   * Their individual steps may depend on captured values
+   * and side effects from previous steps.
+   */
   for (
     const scenario
-    of selectedConfig.scenarios ?? []
+    of selectedConfig.scenarios ??
+      []
   ) {
     results.push(
       ...await runScenario(

@@ -2,6 +2,16 @@
 
 All notable changes to Yellow Jacket are documented in this file.
 
+## Unreleased
+
+### Request resilience
+
+- response header expectations
+- configurable retries for transient failures
+- explicit opt-in before retrying mutating requests
+- bounded concurrency for independent routes
+- deterministic result ordering with concurrent execution
+
 ## 0.1.1
 
 Registry recovery release.

@@ -1726,6 +1726,133 @@ test(
 );
 
 test(
+  'baseline --update fails before HTTP when no baseline exists',
+  async (t) => {
+    const requests:
+      string[] = [];
+
+    const server =
+      createServer(
+        (request, response) => {
+          requests.push(
+            request.url ??
+            ''
+          );
+
+          response.setHeader(
+            'content-type',
+            'application/json'
+          );
+
+          response.end(
+            JSON.stringify({
+              ok: true
+            })
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => {
+        server.close();
+      }
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-baseline-update-missing-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://127.0.0.1:${address.port}',
+  baselinePath: './missing-baseline.json',
+  routes: [
+    {
+      name: 'health',
+      path: '/health',
+      expect: {
+        status: 200
+      }
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'baseline',
+          '--update',
+          '--route',
+          'health'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      2
+    );
+
+    assert.equal(
+      result.stdout,
+      ''
+    );
+
+    assert.match(
+      result.stderr,
+      /Cannot update baseline because no baseline exists/
+    );
+
+    assert.deepEqual(
+      requests,
+      []
+    );
+  }
+);
+
+test(
   'baseline --update refreshes only selected snapshots',
   async (t) => {
     const requests:

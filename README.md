@@ -12,7 +12,9 @@ block a Git push when application behavior changes unexpectedly.
 ## Highlights
 
 - GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS requests
-- status, content-type and response-duration expectations
+- status, content-type, response-header and response-duration expectations
+- safe configurable request retries
+- bounded concurrency for independent routes
 - JSON and text response snapshots
 - structured response diffs
 - ignored dynamic response values
@@ -243,6 +245,91 @@ expect: {
 
 Duration is treated as an explicit budget rather than a baseline value, avoiding
 noisy timing regressions between runs.
+
+## Response header expectations
+
+Response headers can be asserted directly without adding them to the baseline:
+
+```js
+expect: {
+  headers: {
+    'x-api-version':
+      '2',
+
+    'cache-control': [
+      'no-cache',
+      'no-store'
+    ]
+  }
+}
+```
+
+Header names are case-insensitive. Expected values are exact strings.
+
+## Retries
+
+Retries are opt-in. Without configuration every request is attempted once.
+
+```js
+retries: {
+  maxAttempts:
+    3,
+
+  delayMs:
+    100,
+
+  statuses: [
+    429,
+    502,
+    503,
+    504
+  ]
+}
+```
+
+Safe requests can be retried after network failures or configured transient
+statuses.
+
+Mutating methods are never retried by default, even when global retries are
+enabled. Explicitly opt in for a route when the operation is known to be safe
+to repeat:
+
+```js
+{
+  method:
+    'POST',
+
+  path:
+    '/jobs',
+
+  retry: {
+    maxAttempts:
+      2,
+
+    retryActions:
+      true
+  }
+}
+```
+
+Set `retry: false` on a route or scenario step to disable inherited retries.
+
+## Route concurrency
+
+Independent top-level routes are sequential by default.
+
+Enable bounded concurrency with:
+
+```js
+concurrency:
+  4
+```
+
+Results retain configuration order.
+
+Scenarios are intentionally not parallelized. Their steps always execute
+sequentially because later requests may depend on captures or side effects from
+earlier steps.
 
 ## Baselines
 
