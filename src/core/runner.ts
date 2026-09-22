@@ -39,6 +39,67 @@ function expectedStatusMatches(
     : expected === status;
 }
 
+function normalizeContentType(
+  value: string | null
+): string | null {
+  if (
+    value ===
+    null
+  ) {
+    return null;
+  }
+
+  const mediaType =
+    value
+      .split(
+        ';',
+        1
+      )[0]
+      ?.trim()
+      .toLowerCase();
+
+  return mediaType ||
+    null;
+}
+
+function expectedContentTypeMatches(
+  route: RouteDefinition,
+  contentType: string | null
+): boolean {
+  const expected =
+    route.expect
+      ?.contentType;
+
+  if (
+    expected ===
+    undefined
+  ) {
+    return true;
+  }
+
+  const values =
+    Array.isArray(
+      expected
+    )
+      ? expected
+      : [
+          expected
+        ];
+
+  const actual =
+    normalizeContentType(
+      contentType
+    );
+
+  return values.some(
+    (value) =>
+      normalizeContentType(
+        value
+      ) ===
+      actual
+  );
+}
+
 function parseBody(
   text: string,
   contentType: string | null
@@ -370,11 +431,77 @@ export async function runRoute(
         'content-type'
       );
 
+    const durationMs =
+      durationSince(
+        startedAt
+      );
+
     const statusMatches =
       expectedStatusMatches(
         route,
         response.status
       );
+
+    const contentTypeMatches =
+      expectedContentTypeMatches(
+        route,
+        contentType
+      );
+
+    const errors:
+      string[] = [];
+
+    if (
+      !statusMatches
+    ) {
+      errors.push(
+        `Expected status ${String(
+          route.expect?.status
+        )}, received ${response.status}.`
+      );
+    }
+
+    if (
+      !contentTypeMatches
+    ) {
+      const expected =
+        route.expect
+          ?.contentType;
+
+      const label =
+        Array.isArray(
+          expected
+        )
+          ? expected.join(
+              ' or '
+            )
+          : String(
+              expected
+            );
+
+      errors.push(
+        `Expected content-type ${label}, received ${String(
+          normalizeContentType(
+            contentType
+          )
+        )}.`
+      );
+    }
+
+    const maxDurationMs =
+      route.expect
+        ?.maxDurationMs;
+
+    if (
+      maxDurationMs !==
+        undefined &&
+      durationMs >
+        maxDurationMs
+    ) {
+      errors.push(
+        `Expected response within ${maxDurationMs}ms, received ${durationMs}ms.`
+      );
+    }
 
     const responseHeaders =
       captureResponseHeaders(
@@ -396,10 +523,7 @@ export async function runRoute(
           text,
           contentType
         ),
-      durationMs:
-        durationSince(
-          startedAt
-        ),
+      durationMs,
 
       ...(Object.keys(
         responseHeaders
@@ -417,15 +541,17 @@ export async function runRoute(
         url,
 
       passed:
-        statusMatches,
+        errors.length ===
+        0,
 
-      ...(statusMatches
+      ...(errors.length ===
+        0
         ? {}
         : {
             error:
-              `Expected status ${String(
-                route.expect?.status
-              )}, received ${response.status}.`
+              errors.join(
+                ' '
+              )
           })
     };
   } catch (error) {

@@ -704,3 +704,228 @@ test(
     );
   }
 );
+
+test(
+  'accepts normalized expected response content types',
+  async (t) => {
+    const server =
+      createServer(
+        (_request, response) => {
+          response.setHeader(
+            'content-type',
+            'Application/JSON; charset=utf-8'
+          );
+
+          response.end(
+            JSON.stringify({
+              ok: true
+            })
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => server.close()
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            `http://127.0.0.1:${address.port}`
+        },
+        {
+          path:
+            '/',
+
+          expect: {
+            contentType: [
+              'text/html',
+              'application/json'
+            ]
+          }
+        }
+      );
+
+    assert.equal(
+      result.passed,
+      true
+    );
+
+    assert.deepEqual(
+      result.body,
+      {
+        ok: true
+      }
+    );
+  }
+);
+
+test(
+  'fails when the response content type does not match',
+  async (t) => {
+    const server =
+      createServer(
+        (_request, response) => {
+          response.setHeader(
+            'content-type',
+            'text/plain; charset=utf-8'
+          );
+
+          response.end(
+            'hello'
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => server.close()
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            `http://127.0.0.1:${address.port}`
+        },
+        {
+          path:
+            '/',
+
+          expect: {
+            contentType:
+              'application/json'
+          }
+        }
+      );
+
+    assert.equal(
+      result.passed,
+      false
+    );
+
+    assert.match(
+      result.error ?? '',
+      /Expected content-type application\/json, received text\/plain/
+    );
+  }
+);
+
+test(
+  'fails when a response exceeds its duration budget',
+  async (t) => {
+    const server =
+      createServer(
+        async (
+          _request,
+          response
+        ) => {
+          await new Promise<void>(
+            (resolvePromise) => {
+              setTimeout(
+                resolvePromise,
+                40
+              );
+            }
+          );
+
+          response.end(
+            'ok'
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => server.close()
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            `http://127.0.0.1:${address.port}`
+        },
+        {
+          path:
+            '/',
+
+          expect: {
+            maxDurationMs:
+              5
+          }
+        }
+      );
+
+    assert.equal(
+      result.passed,
+      false
+    );
+
+    assert.match(
+      result.error ?? '',
+      /Expected response within 5ms/
+    );
+
+    assert.ok(
+      result.durationMs >
+      5
+    );
+  }
+);

@@ -78,6 +78,67 @@ function validateTags(
   }
 }
 
+function validateExpectation(
+  route: RouteDefinition,
+  source: string
+): void {
+  const contentType =
+    route.expect?.contentType;
+
+  if (
+    contentType !==
+    undefined
+  ) {
+    const valid =
+      typeof contentType ===
+        'string'
+        ? contentType.trim()
+            .length >
+          0
+        : Array.isArray(
+              contentType
+            ) &&
+          contentType.length >
+            0 &&
+          contentType.every(
+            (value) =>
+              typeof value ===
+                'string' &&
+              value.trim()
+                .length >
+                0
+          );
+
+    if (!valid) {
+      throw new Error(
+        `${source} expect.contentType must be a non-empty string or array of non-empty strings.`
+      );
+    }
+  }
+
+  const maxDurationMs =
+    route.expect
+      ?.maxDurationMs;
+
+  if (
+    maxDurationMs !==
+      undefined &&
+    (
+      typeof maxDurationMs !==
+        'number' ||
+      !Number.isFinite(
+        maxDurationMs
+      ) ||
+      maxDurationMs <=
+        0
+    )
+  ) {
+    throw new Error(
+      `${source} expect.maxDurationMs must be a positive finite number.`
+    );
+  }
+}
+
 export function defineConfig(
   config: YellowJacketConfig
 ): YellowJacketConfig {
@@ -249,6 +310,11 @@ export async function loadConfig(
       route.tags,
       `${path} route ${route.name ?? route.path}`
     );
+
+    validateExpectation(
+      route,
+      `${path} route ${route.name ?? route.path}`
+    );
   }
 
   for (
@@ -294,6 +360,11 @@ export async function loadConfig(
       of scenario.steps
     ) {
       validateRedirect(
+        step,
+        `${path} scenario ${scenario.name} > ${step.name ?? step.path}`
+      );
+
+      validateExpectation(
         step,
         `${path} scenario ${scenario.name} > ${step.name ?? step.path}`
       );

@@ -18,6 +18,8 @@ export type RedirectMode =
 
 export interface RouteExpectation {
   status?: number | number[];
+  contentType?: string | string[];
+  maxDurationMs?: number;
 }
 
 export interface RouteDefinition {

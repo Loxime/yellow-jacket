@@ -218,6 +218,68 @@ expect: {
 }
 ```
 
+## Content type expectations
+
+Routes and scenario steps can require a response media type:
+
+```js
+expect: {
+  status:
+    200,
+
+  contentType:
+    'application/json'
+}
+```
+
+Multiple media types can be accepted:
+
+```js
+expect: {
+  contentType: [
+    'application/json',
+    'application/problem+json'
+  ]
+}
+```
+
+Comparison is case-insensitive and ignores content type parameters.
+
+For example:
+
+```text
+Application/JSON; charset=utf-8
+```
+
+matches:
+
+```text
+application/json
+```
+
+## Response duration budgets
+
+A route or scenario step can define a maximum response duration:
+
+```js
+expect: {
+  status:
+    200,
+
+  maxDurationMs:
+    500
+}
+```
+
+If the complete HTTP response takes longer than the configured budget, the
+request fails.
+
+Duration budgets are explicit expectations rather than baseline comparisons.
+This avoids treating small timing variations between runs as regressions.
+
+Content type and duration expectation failures are also included automatically
+in native GitHub Actions and GitLab reports.
+
 ## Ignore dynamic values
 
 Values that legitimately change between requests can be ignored:

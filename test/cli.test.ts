@@ -1976,3 +1976,66 @@ test(
     );
   }
 );
+
+test(
+  'rejects invalid response expectation configuration',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-invalid-expectation-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive: true,
+            force: true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  routes: [
+    {
+      path: '/health',
+      expect: {
+        maxDurationMs: -1
+      }
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'run'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.match(
+      result.stderr,
+      /expect\.maxDurationMs must be a positive finite number/
+    );
+  }
+);
