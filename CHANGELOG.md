@@ -2,6 +2,13 @@
 
 All notable changes to Yellow Jacket are documented in this file.
 
+## Unreleased
+
+### Package API
+
+- expose `parseRetryAfter` and `calculateEffectiveRetryDelay` from the package entrypoint
+- add a public API regression test for retry scheduling helpers
+
 ## 0.4.0
 
 ### Retry-After handling

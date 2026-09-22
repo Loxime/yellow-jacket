@@ -5,7 +5,9 @@ export {
 } from './core/config.js';
 
 export {
+  calculateEffectiveRetryDelay,
   calculateRetryDelay,
+  parseRetryAfter,
   isActionMethod,
   isSafeActionTarget,
   runRoute,
