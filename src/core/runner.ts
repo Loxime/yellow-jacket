@@ -8,6 +8,7 @@ import {
 
 import type {
   HttpMethod,
+  RetryBackoff,
   RetryConfig,
   RouteDefinition,
   RouteRunResult,
@@ -38,6 +39,8 @@ const DEFAULT_RETRY_STATUSES =
 interface EffectiveRetryConfig {
   maxAttempts: number;
   delayMs: number;
+  backoff: RetryBackoff;
+  jitterMs: number;
   statuses: ReadonlySet<number>;
 }
 
@@ -468,6 +471,10 @@ function effectiveRetryConfig(
         1,
       delayMs:
         0,
+      backoff:
+        'fixed',
+      jitterMs:
+        0,
       statuses:
         new Set()
     };
@@ -508,6 +515,17 @@ function effectiveRetryConfig(
       globalRetry.delayMs
     );
 
+  const backoff =
+    routeRetry.backoff ??
+    globalRetry.backoff ??
+    'fixed';
+
+  const jitterMs =
+    nonNegativeDelay(
+      routeRetry.jitterMs ??
+      globalRetry.jitterMs
+    );
+
   const statuses =
     new Set<number>(
       routeRetry.statuses ??
@@ -518,8 +536,55 @@ function effectiveRetryConfig(
   return {
     maxAttempts,
     delayMs,
+    backoff,
+    jitterMs,
     statuses
   };
+}
+
+export function calculateRetryDelay(
+  delayMs: number,
+  backoff: RetryBackoff,
+  jitterMs: number,
+  attempt: number,
+  randomValue = Math.random()
+): number {
+  const backoffDelay =
+    backoff ===
+      'exponential'
+      ? delayMs *
+        (2 ** (
+          attempt -
+          1
+        ))
+      : delayMs;
+
+  const jitter =
+    jitterMs *
+    randomValue;
+
+  return (
+    Math.round(
+      (
+        backoffDelay +
+        jitter
+      ) *
+      100
+    ) /
+    100
+  );
+}
+
+function retryDelay(
+  retry: EffectiveRetryConfig,
+  attempt: number
+): number {
+  return calculateRetryDelay(
+    retry.delayMs,
+    retry.backoff,
+    retry.jitterMs,
+    attempt
+  );
 }
 
 async function wait(
@@ -633,6 +698,8 @@ export async function runRoute(
         durationSince(
           startedAt
         ),
+      attempts:
+        0,
       passed:
         false,
       error:
@@ -756,7 +823,10 @@ export async function runRoute(
         )
       ) {
         await wait(
-          retry.delayMs
+          retryDelay(
+            retry,
+            attempt
+          )
         );
 
         continue;
@@ -869,6 +939,9 @@ export async function runRoute(
           ),
         durationMs,
 
+        attempts:
+          attempt,
+
         ...(Object.keys(
           responseHeaders
         ).length >
@@ -905,7 +978,10 @@ export async function runRoute(
           retry.maxAttempts
       ) {
         await wait(
-          retry.delayMs
+          retryDelay(
+            retry,
+            attempt
+          )
         );
 
         continue;
@@ -927,6 +1003,8 @@ export async function runRoute(
           durationSince(
             startedAt
           ),
+        attempts:
+          attempt,
         passed:
           false,
         error:

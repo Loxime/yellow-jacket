@@ -1,0 +1,88 @@
+name: Bug report
+description: Report a reproducible Yellow Jacket problem.
+title: "[bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a Yellow Jacket problem.
+
+        Please remove secrets, tokens, credentials and private response data
+        before submitting logs or configuration.
+
+  - type: input
+    id: version
+    attributes:
+      label: Yellow Jacket version
+      description: Output of `npm view @falche/yellow-jacket version` or your installed version.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      description: Output of `node --version`.
+      placeholder: "v24.21.0"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system / CI
+      placeholder: "Ubuntu 24.04, macOS, Windows, GitHub Actions, GitLab CI..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: Which Yellow Jacket command produced the problem?
+      placeholder: "yellow-jacket run --github"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Minimal configuration
+      description: Paste a reduced configuration with all secrets removed.
+      render: javascript
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: Paste the smallest useful error or report excerpt.
+      render: text
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest sequence that reproduces the issue.
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Sensitive data
+      options:
+        - label: I removed tokens, credentials and private response data from this report.
+          required: true

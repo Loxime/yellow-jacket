@@ -278,6 +278,12 @@ retries: {
   delayMs:
     100,
 
+  backoff:
+    'exponential',
+
+  jitterMs:
+    50,
+
   statuses: [
     429,
     502,
@@ -289,6 +295,10 @@ retries: {
 
 Safe requests can be retried after network failures or configured transient
 statuses.
+
+`delayMs` uses a fixed delay by default. Set `backoff: 'exponential'` to double
+the base delay after each failed attempt. `jitterMs` adds up to the configured
+number of random milliseconds to each retry delay.
 
 Mutating methods are never retried by default, even when global retries are
 enabled. Explicitly opt in for a route when the operation is known to be safe
@@ -313,6 +323,12 @@ to repeat:
 ```
 
 Set `retry: false` on a route or scenario step to disable inherited retries.
+
+Run results expose the number of HTTP attempts performed. CLI, JSON, Markdown,
+HTML, GitHub Actions and GitLab reports surface retried requests.
+
+Response duration includes the complete operation, including retry attempts and
+configured retry delays.
 
 ## Route concurrency
 
@@ -828,6 +844,18 @@ yellow-jacket uninstall
 Full documentation:
 
 https://loxime.github.io/yellow-jacket/
+
+## Feedback and contributing
+
+Bug reports, feature requests and general usage feedback are welcome.
+
+GitHub provides dedicated issue forms for bugs, feature requests and user
+feedback. Equivalent issue templates are also included for the GitLab mirror.
+
+Please remove tokens, credentials and private response data before sharing logs
+or configuration.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and reporting guidance.
 
 ## Development
 

@@ -5,6 +5,7 @@ export {
 } from './core/config.js';
 
 export {
+  calculateRetryDelay,
   isActionMethod,
   isSafeActionTarget,
   runRoute,
@@ -89,6 +90,7 @@ export type {
   DoctorReport,
   HttpMethod,
   Regression,
+  RetryBackoff,
   RetryConfig,
   ResponseSnapshot,
   RouteDefinition,

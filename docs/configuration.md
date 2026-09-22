@@ -317,6 +317,12 @@ retries: {
   delayMs:
     100,
 
+  backoff:
+    'exponential',
+
+  jitterMs:
+    50,
+
   statuses: [
     408,
     425,
@@ -330,6 +336,29 @@ retries: {
 ```
 
 A retry can occur after a network error or one of the configured statuses.
+
+The default retry delay strategy is fixed, preserving the behavior of
+`delayMs` from earlier releases.
+
+With:
+
+```js
+backoff:
+  'exponential'
+```
+
+the delays before successive retries are:
+
+```text
+delayMs
+delayMs * 2
+delayMs * 4
+...
+```
+
+`jitterMs` adds a random value from `0` up to the configured number of
+milliseconds to each calculated retry delay. Set it to `0` or omit it for
+deterministic delays.
 
 A status explicitly accepted by `expect.status` is not retried.
 
@@ -360,6 +389,14 @@ A route or scenario step can disable inherited retries:
 retry:
   false
 ```
+
+Every run result exposes the number of HTTP attempts performed.
+
+Retry information is included in CLI, JSON, Markdown, HTML, GitHub Actions and
+GitLab reports. Response duration covers the complete operation, including
+retry attempts and configured delays.
+
+Retry metadata is execution-only and is not persisted in baselines.
 
 ## Concurrency
 

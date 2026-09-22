@@ -294,6 +294,11 @@ test(
     );
 
     assert.equal(
+      result.attempts,
+      2
+    );
+
+    assert.equal(
       result.passed,
       true
     );
@@ -962,6 +967,166 @@ test(
       result.error ??
         '',
       /Expected header x-empty "", received null/
+    );
+  }
+);
+
+test(
+  'calculates fixed and exponential retry delays with jitter',
+  async () => {
+    const {
+      calculateRetryDelay
+    } =
+      await import(
+        '../src/core/runner.js'
+      );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'fixed',
+        0,
+        3,
+        0.5
+      ),
+      100
+    );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'exponential',
+        0,
+        1,
+        0.5
+      ),
+      100
+    );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'exponential',
+        0,
+        2,
+        0.5
+      ),
+      200
+    );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'exponential',
+        0,
+        3,
+        0.5
+      ),
+      400
+    );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'exponential',
+        50,
+        2,
+        0.5
+      ),
+      225
+    );
+  }
+);
+
+test(
+  'rejects invalid retry backoff and jitter configuration',
+  async (t) => {
+    const backoffDirectory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-retry-backoff-config-'
+        )
+      );
+
+    const jitterDirectory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-retry-jitter-config-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          backoffDirectory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+
+        await rm(
+          jitterDirectory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        backoffDirectory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  retries: {
+    backoff: 'linear'
+  },
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      () =>
+        loadConfig(
+          backoffDirectory
+        ),
+      /retry\.backoff must be "fixed" or "exponential"/
+    );
+
+    await writeFile(
+      join(
+        jitterDirectory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  retries: {
+    jitterMs: -1
+  },
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      () =>
+        loadConfig(
+          jitterDirectory
+        ),
+      /retry\.jitterMs must be a non-negative finite number/
     );
   }
 );

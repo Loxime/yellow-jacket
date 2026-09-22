@@ -552,6 +552,55 @@ function runKey(
   return `${method} ${route}`;
 }
 
+function resultAttempts(
+  result:
+    RunReport['results'][number]
+): number {
+  return (
+    result.attempts ??
+    1
+  );
+}
+
+function totalRunAttempts(
+  report: RunReport
+): number {
+  return report.results.reduce(
+    (
+      total,
+      result
+    ) =>
+      total +
+      resultAttempts(
+        result
+      ),
+    0
+  );
+}
+
+function retriedRequestCount(
+  report: RunReport
+): number {
+  return report.results.filter(
+    (result) =>
+      resultAttempts(
+        result
+      ) >
+      1
+  ).length;
+}
+
+function httpAttemptLabel(
+  attempts: number
+): string {
+  return `${attempts} HTTP ${
+    attempts ===
+      1
+      ? 'attempt'
+      : 'attempts'
+  }`;
+}
+
 function formatBodyValue(
   value: unknown
 ): string {
@@ -645,6 +694,12 @@ export function formatRunMarkdown(
         : '❌ Failed'
     }`,
     `**Requests:** ${report.results.length}`,
+    `**HTTP attempts:** ${totalRunAttempts(
+      report
+    )}`,
+    `**Retried requests:** ${retriedRequestCount(
+      report
+    )}`,
     `**Failed assertions:** ${failedAssertions.length}`,
     `**Regressions:** ${report.regressions.length}`,
     `**Baseline:** ${
@@ -667,11 +722,22 @@ export function formatRunMarkdown(
       const result
       of failedAssertions
     ) {
+      const attempts =
+        resultAttempts(
+          result
+        );
+
+      const retrySuffix =
+        attempts >
+          1
+          ? ` after ${attempts} attempts`
+          : '';
+
       lines.push(
         `- \`${result.method} ${result.route}\` — ${
           result.error ??
           `request failed with status ${result.status}`
-        }`
+        }${retrySuffix}`
       );
     }
   }
@@ -759,6 +825,16 @@ export function formatRunHtml(
         !result.passed
     );
 
+  const attempts =
+    totalRunAttempts(
+      report
+    );
+
+  const retried =
+    retriedRequestCount(
+      report
+    );
+
   const resultRows =
     report.results
       .map(
@@ -779,6 +855,11 @@ export function formatRunHtml(
           </td>
           <td>
             ${result.durationMs}ms
+          </td>
+          <td>
+            ${resultAttempts(
+              result
+            )}
           </td>
           <td>
             <span class="status ${
@@ -1045,6 +1126,16 @@ export function formatRunHtml(
       </div>
 
       <div class="metric">
+        <span>HTTP attempts</span>
+        <strong>${attempts}</strong>
+      </div>
+
+      <div class="metric">
+        <span>Retried requests</span>
+        <strong>${retried}</strong>
+      </div>
+
+      <div class="metric">
         <span>Failed assertions</span>
         <strong>${failedAssertions.length}</strong>
       </div>
@@ -1085,6 +1176,7 @@ export function formatRunHtml(
               <th>Route</th>
               <th>Status</th>
               <th>Duration</th>
+              <th>Attempts</th>
               <th>Result</th>
             </tr>
           </thead>
@@ -1132,20 +1224,42 @@ export function formatRunGitHub(
     const result
     of report.results
   ) {
+    const attempts =
+      resultAttempts(
+        result
+      );
+
     if (
-      result.passed
+      !result.passed
     ) {
+      const retrySuffix =
+        attempts >
+          1
+          ? ` after ${attempts} attempts`
+          : '';
+
+      lines.push(
+        `::error title=Yellow Jacket assertion::${escapeGitHubCommandData(
+          `${result.method} ${result.route}: ${
+            result.error ??
+            `request failed with status ${result.status}`
+          }${retrySuffix}`
+        )}`
+      );
+
       continue;
     }
 
-    lines.push(
-      `::error title=Yellow Jacket assertion::${escapeGitHubCommandData(
-        `${result.method} ${result.route}: ${
-          result.error ??
-          `request failed with status ${result.status}`
-        }`
-      )}`
-    );
+    if (
+      attempts >
+        1
+    ) {
+      lines.push(
+        `::notice title=Yellow Jacket retry::${escapeGitHubCommandData(
+          `${result.method} ${result.route} passed after ${attempts} attempts.`
+        )}`
+      );
+    }
   }
 
   for (
@@ -1179,7 +1293,13 @@ export function formatRunGitHub(
   ) {
     lines.push(
       `::notice title=Yellow Jacket run::${escapeGitHubCommandData(
-        `${report.results.length} HTTP request(s) passed with no detected regressions.`
+        `${report.results.length} HTTP request(s) passed with no detected regressions. ${httpAttemptLabel(
+          totalRunAttempts(
+            report
+          )
+        )}; ${retriedRequestCount(
+          report
+        )} retried request(s).`
       )}`
     );
   }
@@ -1232,6 +1352,11 @@ export function formatRunGitLab(
       key
     );
 
+    const attempts =
+      resultAttempts(
+        result
+      );
+
     const messages:
       string[] = [];
 
@@ -1262,21 +1387,55 @@ export function formatRunGitLab(
     const name =
       `${result.method} ${result.route}`;
 
-    if (
-      messages.length === 0
-    ) {
-      cases.push({
-        failed:
-          false,
+    const attemptOutput =
+      attempts >
+        1
+        ? `      <system-out>${escapeXml(
+            httpAttemptLabel(
+              attempts
+            )
+          )}</system-out>`
+        : null;
 
-        xml:
-          `    <testcase classname="yellow-jacket.run" name="${escapeXml(
-            name
-          )}" time="${(
-            result.durationMs /
-            1000
-          ).toFixed(3)}" />`
-      });
+    if (
+      messages.length ===
+        0
+    ) {
+      if (
+        attemptOutput ===
+          null
+      ) {
+        cases.push({
+          failed:
+            false,
+
+          xml:
+            `    <testcase classname="yellow-jacket.run" name="${escapeXml(
+              name
+            )}" time="${(
+              result.durationMs /
+              1000
+            ).toFixed(3)}" />`
+        });
+      } else {
+        cases.push({
+          failed:
+            false,
+
+          xml: [
+            `    <testcase classname="yellow-jacket.run" name="${escapeXml(
+              name
+            )}" time="${(
+              result.durationMs /
+              1000
+            ).toFixed(3)}">`,
+            attemptOutput,
+            '    </testcase>'
+          ].join(
+            '\n'
+          )
+        });
+      }
 
       continue;
     }
@@ -1292,6 +1451,14 @@ export function formatRunGitLab(
           result.durationMs /
           1000
         ).toFixed(3)}">`,
+        ...(
+          attemptOutput ===
+            null
+            ? []
+            : [
+                attemptOutput
+              ]
+        ),
         `      <failure message="Yellow Jacket run failed">${escapeXml(
           messages.join(
             '\n'
@@ -1350,6 +1517,15 @@ export function formatRunGitLab(
         item.failed
     ).length;
 
+  const attemptSummary =
+    `${httpAttemptLabel(
+      totalRunAttempts(
+        report
+      )
+    )}; ${retriedRequestCount(
+      report
+    )} retried request(s).`;
+
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<testsuite name="Yellow Jacket run" tests="${cases.length}" failures="${failures}" skipped="0">`,
@@ -1359,8 +1535,8 @@ export function formatRunGitLab(
     ),
     `  <system-out>${escapeXml(
       report.baselineFound
-        ? `${report.results.length} request(s), ${report.regressions.length} regression(s).`
-        : `${report.results.length} request(s). No baseline found; regression comparison was skipped.`
+        ? `${report.results.length} request(s), ${report.regressions.length} regression(s). ${attemptSummary}`
+        : `${report.results.length} request(s). No baseline found; regression comparison was skipped. ${attemptSummary}`
     )}</system-out>`,
     '</testsuite>',
     ''

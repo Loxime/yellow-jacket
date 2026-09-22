@@ -1,0 +1,10 @@
+blank_issues_enabled: true
+
+contact_links:
+  - name: Documentation
+    url: https://loxime.github.io/yellow-jacket/
+    about: Check the Yellow Jacket documentation before filing an issue.
+
+  - name: GitLab mirror
+    url: https://gitlab.rusanor.fr/inquest/inquest-dev/yellow-jacket
+    about: Yellow Jacket is also mirrored on GitLab.

@@ -132,8 +132,18 @@ function printResults(
         ? '✓'
         : '✗';
 
+    const attempts =
+      result.attempts ??
+      1;
+
+    const attemptSuffix =
+      attempts ===
+        1
+        ? ''
+        : ` [${attempts} attempts]`;
+
     console.log(
-      `${marker} ${result.method.padEnd(7)} ${result.route.padEnd(24)} ${String(result.status).padEnd(3)} ${result.durationMs}ms`
+      `${marker} ${result.method.padEnd(7)} ${result.route.padEnd(24)} ${String(result.status).padEnd(3)} ${result.durationMs}ms${attemptSuffix}`
     );
 
     if (result.error) {
