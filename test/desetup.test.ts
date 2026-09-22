@@ -84,7 +84,7 @@ test(
           },
 
           devDependencies: {
-            'yellow-jacket':
+            '@falche/yellow-jacket':
               '0.0.0'
           }
         },
@@ -123,6 +123,30 @@ test(
       ),
       '{}\n',
       'utf8'
+    );
+
+    const previousDryRun =
+      process.env
+        .npm_config_dry_run;
+
+    process.env
+      .npm_config_dry_run =
+        'true';
+
+    t.after(
+      () => {
+        if (
+          previousDryRun ===
+          undefined
+        ) {
+          delete process.env
+            .npm_config_dry_run;
+        } else {
+          process.env
+            .npm_config_dry_run =
+              previousDryRun;
+        }
+      }
     );
 
     const result =
@@ -174,7 +198,7 @@ test(
     assert.equal(
       packageJson
         .devDependencies
-        ?.['yellow-jacket'],
+        ?.['@falche/yellow-jacket'],
       undefined
     );
 

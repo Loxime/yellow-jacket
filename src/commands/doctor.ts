@@ -50,6 +50,9 @@ interface PackageJson {
   [key: string]: unknown;
 }
 
+const PACKAGE_NAME =
+  '@falche/yellow-jacket';
+
 const MINIMUM_NODE = [
   24,
   12,
@@ -170,7 +173,7 @@ function dependencySection(
         .hasOwnProperty
         .call(
           dependencies,
-          'yellow-jacket'
+          PACKAGE_NAME
         )
     ) {
       return section;
@@ -443,14 +446,14 @@ async function checkPackage(
       checks,
       'dependency',
       'pass',
-      `yellow-jacket is declared in ${section}.`
+      `${PACKAGE_NAME} is declared in ${section}.`
     );
   } else {
     addCheck(
       checks,
       'dependency',
       'warning',
-      'yellow-jacket is not declared as a project dependency.'
+      `${PACKAGE_NAME} is not declared as a project dependency.`
     );
   }
 }

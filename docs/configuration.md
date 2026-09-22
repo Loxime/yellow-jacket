@@ -19,7 +19,7 @@ yellow-jacket.config.mjs
 ```js
 import {
   defineConfig
-} from 'yellow-jacket';
+} from '@falche/yellow-jacket';
 
 export default defineConfig({
   baseUrl:

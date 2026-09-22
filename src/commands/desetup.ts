@@ -17,6 +17,9 @@ import {
   uninstallGitHook
 } from '../core/git.js';
 
+const PACKAGE_NAME =
+  '@falche/yellow-jacket';
+
 const CONFIG_FILES = [
   'yellow-jacket.config.ts',
   'yellow-jacket.config.mjs',
@@ -215,7 +218,7 @@ function declaresYellowJacket(
         .hasOwnProperty
         .call(
           section,
-          'yellow-jacket'
+          PACKAGE_NAME
         )
   );
 }
@@ -285,6 +288,13 @@ function runCommand(
   stdout: string;
   stderr: string;
 }> {
+  const env = {
+    ...process.env
+  };
+
+  delete env.npm_config_dry_run;
+  delete env.NPM_CONFIG_DRY_RUN;
+
   return new Promise(
     (
       resolvePromise,
@@ -296,6 +306,7 @@ function runCommand(
           args,
           {
             cwd,
+            env,
             stdio: [
               'ignore',
               'pipe',
@@ -380,18 +391,18 @@ async function removePackageDependency(
     manager === 'npm'
       ? [
           'uninstall',
-          'yellow-jacket',
+          PACKAGE_NAME,
           '--ignore-scripts'
         ]
       : manager === 'pnpm'
         ? [
             'remove',
-            'yellow-jacket',
+            PACKAGE_NAME,
             '--ignore-scripts'
           ]
         : [
             'remove',
-            'yellow-jacket'
+            PACKAGE_NAME
           ];
 
   let result:
@@ -416,7 +427,7 @@ async function removePackageDependency(
       ).code === 'ENOENT'
     ) {
       throw new Error(
-        `Unable to remove yellow-jacket because ${manager} is not installed.`
+        `${PACKAGE_NAME} could not be removed because ${manager} is not installed.`
       );
     }
 
@@ -428,7 +439,7 @@ async function removePackageDependency(
   ) {
     throw new Error(
       [
-        `Unable to remove yellow-jacket with ${manager}.`,
+        `Unable to remove ${PACKAGE_NAME} with ${manager}.`,
         result.stderr.trim()
       ]
         .filter(Boolean)
@@ -586,7 +597,7 @@ export async function desetupProject(
 
   if (packageManager) {
     removed.push(
-      'package dependency yellow-jacket'
+      `package dependency ${PACKAGE_NAME}`
     );
   }
 

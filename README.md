@@ -41,7 +41,7 @@ block a Git push when application behavior changes unexpectedly.
 ## Installation
 
 ```bash
-npm install --save-dev yellow-jacket
+npm install --save-dev @falche/yellow-jacket
 ```
 
 Initialize Yellow Jacket in your project:
@@ -57,7 +57,7 @@ This creates `yellow-jacket.config.mjs`.
 ```js
 import {
   defineConfig
-} from 'yellow-jacket';
+} from '@falche/yellow-jacket';
 
 export default defineConfig({
   baseUrl:
@@ -110,7 +110,7 @@ regressions exit with code `1`.
 ```js
 import {
   defineConfig
-} from 'yellow-jacket';
+} from '@falche/yellow-jacket';
 
 export default defineConfig({
   baseUrl:

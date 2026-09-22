@@ -100,7 +100,7 @@ async function createProject():
           'npm@11.0.0',
 
         devDependencies: {
-          'yellow-jacket':
+          '@falche/yellow-jacket':
             '0.1.0'
         }
       },

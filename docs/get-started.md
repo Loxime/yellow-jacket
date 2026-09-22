@@ -11,31 +11,14 @@ detected.
 - Node.js 24.12+
 - Git for hook installation
 
-## Install for development
+## Install
 
-Yellow Jacket is currently in early development and is not published to npm yet.
-
-Clone the repository:
+Install Yellow Jacket as a development dependency:
 
 ```bash
-git clone https://github.com/Loxime/yellow-jacket.git
-cd yellow-jacket
+npm install --save-dev @falche/yellow-jacket
 ```
-
-Install dependencies and verify the project:
-
-```bash
-npm install
-npm test
-```
-
-Expose the CLI locally:
-
-```bash
-npm link
-```
-
-The `yellow-jacket` command is now available from other local projects.
+The package exposes the yellow-jacket CLI command.
 
 ## Initialize a project
 
@@ -62,7 +45,7 @@ A minimal configuration looks like this:
 ```js
 import {
   defineConfig
-} from 'yellow-jacket';
+} from '@falche/yellow-jacket';
 
 export default defineConfig({
   baseUrl:

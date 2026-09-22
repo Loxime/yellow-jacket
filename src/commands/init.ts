@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-const CONFIG_TEMPLATE = `import { defineConfig } from 'yellow-jacket';
+const CONFIG_TEMPLATE = `import { defineConfig } from '@falche/yellow-jacket';
 
 export default defineConfig({
   baseUrl: process.env.YELLOW_JACKET_URL ?? 'http://localhost:3000',
