@@ -278,6 +278,12 @@ retries: {
   delayMs:
     100,
 
+  backoff:
+    'exponential',
+
+  jitterMs:
+    50,
+
   statuses: [
     429,
     502,
@@ -289,6 +295,10 @@ retries: {
 
 Safe requests can be retried after network failures or configured transient
 statuses.
+
+`delayMs` uses a fixed delay by default. Set `backoff: 'exponential'` to double
+the base delay after each failed attempt. `jitterMs` adds up to the configured
+number of random milliseconds to each retry delay.
 
 Mutating methods are never retried by default, even when global retries are
 enabled. Explicitly opt in for a route when the operation is known to be safe

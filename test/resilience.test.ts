@@ -970,3 +970,145 @@ test(
     );
   }
 );
+
+test(
+  'calculates fixed and exponential retry delays with jitter',
+  async () => {
+    const {
+      calculateRetryDelay
+    } =
+      await import(
+        '../src/core/runner.js'
+      );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'fixed',
+        0,
+        3,
+        0.5
+      ),
+      100
+    );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'exponential',
+        0,
+        1,
+        0.5
+      ),
+      100
+    );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'exponential',
+        0,
+        2,
+        0.5
+      ),
+      200
+    );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'exponential',
+        0,
+        3,
+        0.5
+      ),
+      400
+    );
+
+    assert.equal(
+      calculateRetryDelay(
+        100,
+        'exponential',
+        50,
+        2,
+        0.5
+      ),
+      225
+    );
+  }
+);
+
+test(
+  'rejects invalid retry backoff and jitter configuration',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-retry-delay-config-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    const configPath =
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      );
+
+    await writeFile(
+      configPath,
+      `export default {
+  baseUrl: 'http://localhost',
+  retries: {
+    backoff: 'linear'
+  },
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      () =>
+        loadConfig(
+          directory
+        ),
+      /retry\.backoff must be "fixed" or "exponential"/
+    );
+
+    await writeFile(
+      configPath,
+      `export default {
+  baseUrl: 'http://localhost',
+  retries: {
+    jitterMs: -1
+  },
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      () =>
+        loadConfig(
+          directory
+        ),
+      /retry\.jitterMs must be a non-negative finite number/
+    );
+  }
+);

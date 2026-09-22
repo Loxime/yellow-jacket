@@ -16,6 +16,12 @@ All notable changes to Yellow Jacket are documented in this file.
 - surface retried requests in CLI, JSON, Markdown, HTML, GitHub and GitLab reports
 - keep retry execution metadata out of stored baselines
 
+### Retry scheduling
+
+- optional exponential retry backoff
+- optional bounded retry jitter
+- preserve fixed `delayMs` behavior by default
+
 ## 0.2.0
 
 ### Request resilience

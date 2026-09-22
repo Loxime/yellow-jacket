@@ -313,6 +313,37 @@ function validateRetry(
   }
 
   if (
+    retry.backoff !==
+      undefined &&
+    retry.backoff !==
+      'fixed' &&
+    retry.backoff !==
+      'exponential'
+  ) {
+    throw new Error(
+      `${source} retry.backoff must be "fixed" or "exponential".`
+    );
+  }
+
+  if (
+    retry.jitterMs !==
+      undefined &&
+    (
+      typeof retry.jitterMs !==
+        'number' ||
+      !Number.isFinite(
+        retry.jitterMs
+      ) ||
+      retry.jitterMs <
+        0
+    )
+  ) {
+    throw new Error(
+      `${source} retry.jitterMs must be a non-negative finite number.`
+    );
+  }
+
+  if (
     retry.statuses !==
       undefined &&
     (

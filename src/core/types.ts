@@ -16,9 +16,15 @@ export type RedirectMode =
   | 'error'
   | 'manual';
 
+export type RetryBackoff =
+  | 'fixed'
+  | 'exponential';
+
 export interface RetryConfig {
   maxAttempts?: number;
   delayMs?: number;
+  backoff?: RetryBackoff;
+  jitterMs?: number;
   statuses?: number[];
   retryActions?: boolean;
 }

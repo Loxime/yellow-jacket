@@ -317,6 +317,12 @@ retries: {
   delayMs:
     100,
 
+  backoff:
+    'exponential',
+
+  jitterMs:
+    50,
+
   statuses: [
     408,
     425,
@@ -330,6 +336,29 @@ retries: {
 ```
 
 A retry can occur after a network error or one of the configured statuses.
+
+The default retry delay strategy is fixed, preserving the behavior of
+`delayMs` from earlier releases.
+
+With:
+
+```js
+backoff:
+  'exponential'
+```
+
+the delays before successive retries are:
+
+```text
+delayMs
+delayMs * 2
+delayMs * 4
+...
+```
+
+`jitterMs` adds a random value from `0` up to the configured number of
+milliseconds to each calculated retry delay. Set it to `0` or omit it for
+deterministic delays.
 
 A status explicitly accepted by `expect.status` is not retried.
 
