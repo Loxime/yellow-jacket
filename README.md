@@ -246,6 +246,22 @@ expect: {
 Duration is treated as an explicit budget rather than a baseline value, avoiding
 noisy timing regressions between runs.
 
+`timeoutMs` controls request cancellation and can be configured globally or
+overridden on an individual route or scenario step:
+
+```js
+{
+  path:
+    '/slow-report',
+
+  timeoutMs:
+    30_000
+}
+```
+
+`timeoutMs` controls how long Yellow Jacket waits for the HTTP operation.
+`expect.maxDurationMs` is a separate assertion on the completed operation.
+
 ## Response header expectations
 
 Response headers can be asserted directly without adding them to the baseline:

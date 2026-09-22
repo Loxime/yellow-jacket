@@ -962,6 +962,7 @@ export async function runRoute(
             'follow',
           signal:
             AbortSignal.timeout(
+              route.timeoutMs ??
               config.timeoutMs ??
                 10_000
             )

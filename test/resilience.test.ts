@@ -1363,3 +1363,207 @@ test(
     );
   }
 );
+
+test(
+  'supports per-route timeout overrides',
+  async (t) => {
+    const server =
+      createServer(
+        async (
+          _request,
+          response
+        ) => {
+          await new Promise<void>(
+            (
+              resolvePromise
+            ) => {
+              setTimeout(
+                resolvePromise,
+                60
+              );
+            }
+          );
+
+          response.end(
+            'ok'
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => {
+        server.close();
+      }
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const baseUrl =
+      `http://127.0.0.1:${address.port}`;
+
+    const locallyExtended =
+      await runRoute(
+        {
+          baseUrl,
+          timeoutMs:
+            10
+        },
+        {
+          path:
+            '/',
+          timeoutMs:
+            500
+        }
+      );
+
+    assert.equal(
+      locallyExtended.passed,
+      true
+    );
+
+    const locallyReduced =
+      await runRoute(
+        {
+          baseUrl,
+          timeoutMs:
+            500
+        },
+        {
+          path:
+            '/',
+          timeoutMs:
+            10
+        }
+      );
+
+    assert.equal(
+      locallyReduced.passed,
+      false
+    );
+
+    assert.equal(
+      locallyReduced.status,
+      0
+    );
+
+    assert.equal(
+      locallyReduced.attempts,
+      1
+    );
+  }
+);
+
+test(
+  'rejects invalid global and scenario timeout configuration',
+  async (t) => {
+    const globalDirectory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-global-timeout-config-'
+        )
+      );
+
+    const scenarioDirectory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-scenario-timeout-config-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          globalDirectory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+
+        await rm(
+          scenarioDirectory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        globalDirectory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  timeoutMs: 0,
+  routes: []
+};
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      () =>
+        loadConfig(
+          globalDirectory
+        ),
+      /timeoutMs must be a positive finite number/
+    );
+
+    await writeFile(
+      join(
+        scenarioDirectory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://localhost',
+  scenarios: [
+    {
+      name: 'slow workflow',
+      steps: [
+        {
+          path: '/slow',
+          timeoutMs: -1
+        }
+      ]
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    await assert.rejects(
+      () =>
+        loadConfig(
+          scenarioDirectory
+        ),
+      /timeoutMs must be a positive finite number/
+    );
+  }
+);

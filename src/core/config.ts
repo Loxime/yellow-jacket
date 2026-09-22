@@ -248,6 +248,32 @@ function validateExpectation(
   }
 }
 
+function validateTimeout(
+  timeoutMs: number | undefined,
+  source: string
+): void {
+  if (
+    timeoutMs ===
+      undefined
+  ) {
+    return;
+  }
+
+  if (
+    typeof timeoutMs !==
+      'number' ||
+    !Number.isFinite(
+      timeoutMs
+    ) ||
+    timeoutMs <=
+      0
+  ) {
+    throw new Error(
+      `${source} timeoutMs must be a positive finite number.`
+    );
+  }
+}
+
 function validateRetry(
   retry:
     RetryConfig |
@@ -516,6 +542,11 @@ export async function loadConfig(
     );
   }
 
+  validateTimeout(
+    config.timeoutMs,
+    path
+  );
+
   validateRetry(
     config.retries,
     `${path} retries`
@@ -600,6 +631,11 @@ export async function loadConfig(
       source
     );
 
+    validateTimeout(
+      route.timeoutMs,
+      source
+    );
+
     validateExpectation(
       route,
       source
@@ -658,6 +694,11 @@ export async function loadConfig(
 
       validateRedirect(
         step,
+        source
+      );
+
+      validateTimeout(
+        step.timeoutMs,
         source
       );
 

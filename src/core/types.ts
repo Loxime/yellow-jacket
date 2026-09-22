@@ -50,6 +50,7 @@ export interface RouteDefinition {
   tags?: string[];
   method?: HttpMethod;
   path: string;
+  timeoutMs?: number;
   headers?: Record<string, string>;
   body?: unknown;
   redirect?: RedirectMode;

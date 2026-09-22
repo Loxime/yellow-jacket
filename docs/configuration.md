@@ -114,6 +114,30 @@ timeoutMs:
 
 When omitted, Yellow Jacket uses a 10 second timeout.
 
+Routes and scenario steps can override the global timeout:
+
+```js
+{
+  path:
+    '/slow-report',
+
+  timeoutMs:
+    30_000
+}
+```
+
+The most specific value wins:
+
+```text
+route or scenario step timeoutMs
+global timeoutMs
+10 second default
+```
+
+Request timeout and duration expectations serve different purposes.
+`timeoutMs` aborts the HTTP operation, while `expect.maxDurationMs` evaluates a
+completed operation against an explicit performance budget.
+
 ## Shared headers
 
 Headers can be declared once:
