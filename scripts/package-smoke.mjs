@@ -48,11 +48,17 @@ const ROOT =
     '..'
   );
 
-const NPM =
-  process.platform ===
-    'win32'
-    ? 'npm.cmd'
-    : 'npm';
+const NPM_CLI =
+  process.env
+    .npm_execpath;
+
+if (
+  !NPM_CLI
+) {
+  throw new Error(
+    'npm_execpath is unavailable. Run this smoke test with "npm run test:package".'
+  );
+}
 
 function run(
   command,
@@ -170,6 +176,20 @@ function run(
   );
 }
 
+function runNpm(
+  args,
+  cwd
+) {
+  return run(
+    process.execPath,
+    [
+      NPM_CLI,
+      ...args
+    ],
+    cwd
+  );
+}
+
 async function closeServer(
   server
 ) {
@@ -258,8 +278,7 @@ try {
     `Packing ${sourcePackage.name}@${sourcePackage.version}...`
   );
 
-  await run(
-    NPM,
+  await runNpm(
     [
       'pack',
       '--pack-destination',
@@ -316,8 +335,7 @@ try {
     'Installing packed tarball in a clean consumer project...'
   );
 
-  await run(
-    NPM,
+  await runNpm(
     [
       'install',
       '--ignore-scripts',
@@ -475,8 +493,7 @@ console.log(
   );
 
   const helpResult =
-    await run(
-      NPM,
+    await runNpm(
       [
         'exec',
         '--offline',
@@ -590,8 +607,7 @@ export default defineConfig({
   );
 
   const baselineResult =
-    await run(
-      NPM,
+    await runNpm(
       [
         'exec',
         '--offline',
@@ -640,8 +656,7 @@ export default defineConfig({
   );
 
   const runResult =
-    await run(
-      NPM,
+    await runNpm(
       [
         'exec',
         '--offline',

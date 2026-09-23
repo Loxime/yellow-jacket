@@ -18,6 +18,20 @@ All notable changes to Yellow Jacket are documented in this file.
 - reject configuration entries that would share the same baseline identity
 - validate baselines before a normal run sends HTTP requests
 
+### Package distribution
+
+- smoke test the generated npm tarball from a clean consumer project
+- verify package-root exports and the installed CLI binary
+- execute a real baseline and regression run using only the packed package
+- require the package smoke test in CI and before npm publication
+
+### Runtime compatibility
+
+- test Node.js 24.12.0 and the current Node.js 24 release
+- run compatibility checks on Ubuntu, macOS and Windows
+- support Windows package-manager command shims during project removal
+- avoid POSIX-only executable-mode assumptions in Git hook tests
+
 ## 0.4.1
 
 ### Package API

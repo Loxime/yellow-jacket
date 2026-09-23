@@ -307,6 +307,11 @@ function runCommand(
           {
             cwd,
             env,
+
+            shell:
+              process.platform ===
+              'win32',
+
             stdio: [
               'ignore',
               'pipe',
