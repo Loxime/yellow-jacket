@@ -907,10 +907,15 @@ cd yellow-jacket
 npm install
 npm run check
 npm test
+npm run test:package
 npm run docs:build
 ```
 
-Inspect the npm package:
+`npm run test:package` packs Yellow Jacket, installs the tarball in a clean
+temporary project, checks the package-root exports and CLI, then executes a real
+`baseline` followed by `run`.
+
+Inspect the tarball contents without installing it:
 
 ```bash
 npm pack --dry-run
