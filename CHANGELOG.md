@@ -2,7 +2,7 @@
 
 All notable changes to Yellow Jacket are documented in this file.
 
-## Unreleased
+## 0.5.0
 
 ### Action safety
 
