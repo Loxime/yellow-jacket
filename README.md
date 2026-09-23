@@ -393,6 +393,14 @@ response headers, redirect behavior and the final redirect URL.
 
 Response duration is recorded but is not baseline-diffed.
 
+Baselines currently use `formatVersion: 1`. Existing baselines are validated
+before `run`, partial updates and `doctor` use them. A malformed or unsupported
+baseline is rejected before HTTP requests are sent.
+
+Each stored response is identified by its HTTP method and displayed route
+label. These identities must be unique. Routes with the same label remain valid
+when their HTTP methods differ.
+
 ## Structured response diffs
 
 JSON bodies are compared structurally.

@@ -808,6 +808,21 @@ async function main():
     return;
   }
 
+  let baselineForRun:
+    BaselineFile |
+    null |
+    undefined;
+
+  if (
+    command ===
+      'run'
+  ) {
+    baselineForRun =
+      await readBaseline(
+        config
+      );
+  }
+
   let baselineForUpdate:
     BaselineFile | undefined;
 
@@ -927,9 +942,8 @@ async function main():
   }
 
   const baseline =
-    await readBaseline(
-      config
-    );
+    baselineForRun ??
+    null;
 
   const regressions =
     baseline

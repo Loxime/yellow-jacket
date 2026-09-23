@@ -487,23 +487,6 @@ async function checkBaseline(
       return;
     }
 
-    if (
-      baseline.formatVersion !==
-        1 ||
-      !Array.isArray(
-        baseline.responses
-      )
-    ) {
-      addCheck(
-        checks,
-        'baseline',
-        'error',
-        `Baseline has an unsupported structure: ${path}.`
-      );
-
-      return;
-    }
-
     addCheck(
       checks,
       'baseline',
