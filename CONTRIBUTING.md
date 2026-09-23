@@ -50,6 +50,7 @@ Run the complete validation:
 ```bash
 npm run check
 npm test
+npm run test:package
 npm run docs:build
 ```
 
@@ -63,6 +64,7 @@ Before opening a pull request:
 git diff --check
 npm run check
 npm test
+npm run test:package
 npm run docs:build
 ```
 

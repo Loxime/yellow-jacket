@@ -131,15 +131,20 @@ test(
       installed.hookPath
     );
 
-    const metadata =
-      await stat(
-        installed.hookPath
-      );
+    if (
+      process.platform !==
+        'win32'
+    ) {
+      const metadata =
+        await stat(
+          installed.hookPath
+        );
 
-    assert.notEqual(
-      metadata.mode & 0o111,
-      0
-    );
+      assert.notEqual(
+        metadata.mode & 0o111,
+        0
+      );
+    }
 
     const hook =
       await readFile(
