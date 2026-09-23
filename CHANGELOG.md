@@ -11,6 +11,13 @@ All notable changes to Yellow Jacket are documented in this file.
 - preserve standard redirect method semantics while enforcing action safety
 - avoid retrying requests blocked by the redirect safety guard
 
+### Baseline integrity
+
+- validate baseline format v1 before it is consumed
+- reject malformed or duplicate response snapshots
+- reject configuration entries that would share the same baseline identity
+- validate baselines before a normal run sends HTTP requests
+
 ## 0.4.1
 
 ### Package API

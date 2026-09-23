@@ -15,11 +15,366 @@ import { normalizeBody } from './normalize.js';
 import type {
   BaselineFile,
   CompareConfig,
+  HttpMethod,
   Regression,
   ResponseSnapshot,
   RouteRunResult,
   YellowJacketConfig
 } from './types.js';
+
+const BASELINE_HTTP_METHODS:
+  ReadonlySet<string> =
+    new Set([
+      'GET',
+      'POST',
+      'PUT',
+      'PATCH',
+      'DELETE',
+      'HEAD',
+      'OPTIONS'
+    ]);
+
+function isRecord(
+  value: unknown
+): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value ===
+      'object' &&
+    !Array.isArray(
+      value
+    )
+  );
+}
+
+function invalidBaseline(
+  source: string,
+  message: string
+): never {
+  throw new Error(
+    `Invalid baseline at ${source}: ${message}`
+  );
+}
+
+function requiredString(
+  value: Record<string, unknown>,
+  key: string,
+  source: string
+): string {
+  const result =
+    value[key];
+
+  if (
+    typeof result !==
+      'string' ||
+    result.length ===
+      0
+  ) {
+    invalidBaseline(
+      source,
+      `${key} must be a non-empty string.`
+    );
+  }
+
+  return result;
+}
+
+function validateResponseSnapshot(
+  value: unknown,
+  index: number,
+  source: string
+): ResponseSnapshot {
+  const itemSource =
+    `${source} responses[${index}]`;
+
+  if (
+    !isRecord(
+      value
+    )
+  ) {
+    invalidBaseline(
+      itemSource,
+      'response must be an object.'
+    );
+  }
+
+  const route =
+    requiredString(
+      value,
+      'route',
+      itemSource
+    );
+
+  const rawMethod =
+    requiredString(
+      value,
+      'method',
+      itemSource
+    );
+
+  if (
+    !BASELINE_HTTP_METHODS.has(
+      rawMethod
+    )
+  ) {
+    invalidBaseline(
+      itemSource,
+      `method "${rawMethod}" is not supported.`
+    );
+  }
+
+  requiredString(
+    value,
+    'url',
+    itemSource
+  );
+
+  const status =
+    value.status;
+
+  if (
+    typeof status !==
+      'number' ||
+    !Number.isInteger(
+      status
+    ) ||
+    status <
+      100 ||
+    status >
+      599
+  ) {
+    invalidBaseline(
+      itemSource,
+      'status must be an HTTP status between 100 and 599.'
+    );
+  }
+
+  if (
+    value.contentType !==
+      null &&
+    typeof value.contentType !==
+      'string'
+  ) {
+    invalidBaseline(
+      itemSource,
+      'contentType must be a string or null.'
+    );
+  }
+
+  if (
+    !Object.prototype
+      .hasOwnProperty
+      .call(
+        value,
+        'body'
+      )
+  ) {
+    invalidBaseline(
+      itemSource,
+      'body is required.'
+    );
+  }
+
+  const durationMs =
+    value.durationMs;
+
+  if (
+    typeof durationMs !==
+      'number' ||
+    !Number.isFinite(
+      durationMs
+    ) ||
+    durationMs <
+      0
+  ) {
+    invalidBaseline(
+      itemSource,
+      'durationMs must be a non-negative finite number.'
+    );
+  }
+
+  const responseHeaders =
+    value.responseHeaders;
+
+  if (
+    responseHeaders !==
+      undefined
+  ) {
+    if (
+      !isRecord(
+        responseHeaders
+      )
+    ) {
+      invalidBaseline(
+        itemSource,
+        'responseHeaders must be an object.'
+      );
+    }
+
+    for (
+      const [
+        name,
+        headerValue
+      ]
+      of Object.entries(
+        responseHeaders
+      )
+    ) {
+      if (
+        headerValue !==
+          null &&
+        typeof headerValue !==
+          'string'
+      ) {
+        invalidBaseline(
+          itemSource,
+          `responseHeaders.${name} must be a string or null.`
+        );
+      }
+    }
+  }
+
+  if (
+    value.redirected !==
+      undefined &&
+    typeof value.redirected !==
+      'boolean'
+  ) {
+    invalidBaseline(
+      itemSource,
+      'redirected must be a boolean.'
+    );
+  }
+
+  if (
+    value.finalUrl !==
+      undefined &&
+    (
+      typeof value.finalUrl !==
+        'string' ||
+      value.finalUrl.length ===
+        0
+    )
+  ) {
+    invalidBaseline(
+      itemSource,
+      'finalUrl must be a non-empty string.'
+    );
+  }
+
+  return value as unknown as
+    ResponseSnapshot;
+}
+
+export function snapshotKey(
+  method: HttpMethod,
+  route: string
+): string {
+  return `${method} ${route}`;
+}
+
+function parseBaselineFile(
+  value: unknown,
+  source: string
+): BaselineFile {
+  if (
+    !isRecord(
+      value
+    )
+  ) {
+    invalidBaseline(
+      source,
+      'root value must be an object.'
+    );
+  }
+
+  if (
+    value.formatVersion !==
+      1
+  ) {
+    invalidBaseline(
+      source,
+      `expected formatVersion 1, received ${JSON.stringify(
+        value.formatVersion
+      )}.`
+    );
+  }
+
+  const createdAt =
+    requiredString(
+      value,
+      'createdAt',
+      source
+    );
+
+  const baseUrl =
+    requiredString(
+      value,
+      'baseUrl',
+      source
+    );
+
+  if (
+    !Array.isArray(
+      value.responses
+    )
+  ) {
+    invalidBaseline(
+      source,
+      'responses must be an array.'
+    );
+  }
+
+  const responses =
+    value.responses.map(
+      (
+        response,
+        index
+      ) =>
+        validateResponseSnapshot(
+          response,
+          index,
+          source
+        )
+    );
+
+  const identities =
+    new Set<string>();
+
+  for (
+    const response
+    of responses
+  ) {
+    const key =
+      snapshotKey(
+        response.method,
+        response.route
+      );
+
+    if (
+      identities.has(
+        key
+      )
+    ) {
+      invalidBaseline(
+        source,
+        `duplicate response identity "${key}".`
+      );
+    }
+
+    identities.add(
+      key
+    );
+  }
+
+  return {
+    formatVersion:
+      1,
+    createdAt,
+    baseUrl,
+    responses
+  };
+}
 
 function normalizeSnapshot(
   snapshot: ResponseSnapshot,
@@ -219,7 +574,10 @@ export async function updateBaseline(
       );
 
     replacements.set(
-      `${snapshot.method} ${snapshot.route}`,
+      snapshotKey(
+        snapshot.method,
+        snapshot.route
+      ),
       snapshot
     );
   }
@@ -228,7 +586,10 @@ export async function updateBaseline(
     baseline.responses.map(
       (snapshot) => {
         const key =
-          `${snapshot.method} ${snapshot.route}`;
+          snapshotKey(
+            snapshot.method,
+            snapshot.route
+          );
 
         const replacement =
           replacements.get(
@@ -301,24 +662,55 @@ export async function readBaseline(
     cwd
   );
 
+  let contents:
+    string;
+
   try {
-    return JSON.parse(
+    contents =
       await readFile(
         path,
         'utf8'
-      )
-    ) as BaselineFile;
+      );
   } catch (error) {
-    const code = (
-      error as NodeJS.ErrnoException
-    ).code;
+    const code =
+      (
+        error as NodeJS.ErrnoException
+      ).code;
 
-    if (code === 'ENOENT') {
+    if (
+      code ===
+        'ENOENT'
+    ) {
       return null;
     }
 
     throw error;
   }
+
+  let parsed:
+    unknown;
+
+  try {
+    parsed =
+      JSON.parse(
+        contents
+      ) as unknown;
+  } catch (error) {
+    throw new Error(
+      `Baseline is not valid JSON at ${path}: ${
+        error instanceof Error
+          ? error.message
+          : String(
+              error
+            )
+      }`
+    );
+  }
+
+  return parseBaselineFile(
+    parsed,
+    path
+  );
 }
 
 export function compareWithBaseline(
@@ -334,7 +726,10 @@ export function compareWithBaseline(
 
   for (const item of baseline.responses) {
     expected.set(
-      `${item.method} ${item.route}`,
+      snapshotKey(
+        item.method,
+        item.route
+      ),
       item
     );
   }
@@ -352,7 +747,10 @@ export function compareWithBaseline(
       );
 
     const key =
-      `${current.method} ${current.route}`;
+      snapshotKey(
+        current.method,
+        current.route
+      );
 
     seen.add(
       key

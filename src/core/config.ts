@@ -11,6 +11,10 @@ import {
 } from 'node:url';
 
 import {
+  snapshotKey
+} from './baseline.js';
+
+import {
   parseJsonPath
 } from './normalize.js';
 
@@ -29,6 +33,129 @@ const CONFIG_FILES = [
   'yellow-jacket.config.mjs',
   'yellow-jacket.config.js'
 ] as const;
+
+const SUPPORTED_HTTP_METHODS:
+  ReadonlySet<string> =
+    new Set([
+      'GET',
+      'POST',
+      'PUT',
+      'PATCH',
+      'DELETE',
+      'HEAD',
+      'OPTIONS'
+    ]);
+
+function validateMethod(
+  route: RouteDefinition,
+  source: string
+): void {
+  const method =
+    route.method ??
+    'GET';
+
+  if (
+    !SUPPORTED_HTTP_METHODS.has(
+      method
+    )
+  ) {
+    throw new Error(
+      `${source} method is not supported: ${String(
+        method
+      )}.`
+    );
+  }
+}
+
+function validateSnapshotIdentities(
+  config: YellowJacketConfig,
+  source: string
+): void {
+  const identities =
+    new Map<
+      string,
+      string
+    >();
+
+  const addIdentity = (
+    key: string,
+    description: string
+  ): void => {
+    const existing =
+      identities.get(
+        key
+      );
+
+    if (
+      existing !==
+        undefined
+    ) {
+      throw new Error(
+        `${source} defines duplicate snapshot identity "${key}" for ${existing} and ${description}. Use distinct labels or HTTP methods.`
+      );
+    }
+
+    identities.set(
+      key,
+      description
+    );
+  };
+
+  for (
+    const [
+      index,
+      route
+    ]
+    of (
+      config.routes ??
+      []
+    ).entries()
+  ) {
+    const label =
+      route.name ??
+      route.path;
+
+    addIdentity(
+      snapshotKey(
+        route.method ??
+          'GET',
+        label
+      ),
+      `route[${index}] ${label}`
+    );
+  }
+
+  for (
+    const [
+      scenarioIndex,
+      scenario
+    ]
+    of (
+      config.scenarios ??
+      []
+    ).entries()
+  ) {
+    for (
+      const [
+        stepIndex,
+        step
+      ]
+      of scenario.steps.entries()
+    ) {
+      const label =
+        `${scenario.name} > ${step.name ?? step.path}`;
+
+      addIdentity(
+        snapshotKey(
+          step.method ??
+            'GET',
+          label
+        ),
+        `scenario[${scenarioIndex}].steps[${stepIndex}] ${label}`
+      );
+    }
+  }
+}
 
 function validateRedirect(
   route: RouteDefinition,
@@ -621,6 +748,11 @@ export async function loadConfig(
     const source =
       `${path} route ${route.name ?? route.path}`;
 
+    validateMethod(
+      route,
+      source
+    );
+
     validateRedirect(
       route,
       source
@@ -692,6 +824,11 @@ export async function loadConfig(
       const source =
         `${path} scenario ${scenario.name} > ${step.name ?? step.path}`;
 
+      validateMethod(
+        step,
+        source
+      );
+
       validateRedirect(
         step,
         source
@@ -728,6 +865,11 @@ export async function loadConfig(
       }
     }
   }
+
+  validateSnapshotIdentities(
+    config,
+    path
+  );
 
   return config;
 }

@@ -2396,3 +2396,137 @@ test(
     );
   }
 );
+
+
+test(
+  'run validates the baseline before sending HTTP requests',
+  async (t) => {
+    let requestCount =
+      0;
+
+    const server =
+      createServer(
+        (_request, response) => {
+          requestCount +=
+            1;
+
+          response.setHeader(
+            'content-type',
+            'application/json'
+          );
+
+          response.end(
+            JSON.stringify({
+              ok:
+                true
+            })
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => server.close()
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-baseline-preflight-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'yellow-jacket.config.mjs'
+      ),
+      `export default {
+  baseUrl: 'http://127.0.0.1:${address.port}',
+  baselinePath: './baseline.json',
+  routes: [
+    {
+      path: '/health'
+    }
+  ]
+};
+`,
+      'utf8'
+    );
+
+    await writeFile(
+      join(
+        directory,
+        'baseline.json'
+      ),
+      JSON.stringify({
+        formatVersion:
+          2,
+        createdAt:
+          new Date(0)
+            .toISOString(),
+        baseUrl:
+          `http://127.0.0.1:${address.port}`,
+        responses:
+          []
+      }),
+      'utf8'
+    );
+
+    const result =
+      await runCli(
+        [
+          'run'
+        ],
+        directory
+      );
+
+    assert.equal(
+      result.code,
+      1
+    );
+
+    assert.equal(
+      requestCount,
+      0
+    );
+
+    assert.match(
+      result.stderr,
+      /expected formatVersion 1/
+    );
+  }
+);

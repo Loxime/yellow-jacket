@@ -48,6 +48,26 @@ Then run:
 yellow-jacket run
 ```
 
+## Invalid or unsupported baseline
+
+Yellow Jacket validates an existing baseline before executing `run`.
+
+For example:
+
+```text
+Invalid baseline at ...: expected formatVersion 1, received 2.
+```
+
+Regenerate the baseline with the current Yellow Jacket version when the file is
+obsolete:
+
+```bash
+yellow-jacket baseline
+```
+
+If the baseline was edited manually or has merge-conflict damage, restore or
+regenerate it rather than bypassing validation.
+
 ## Mutating request blocked
 
 Example:
