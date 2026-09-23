@@ -94,7 +94,9 @@ The generated Yellow Jacket hook does not pass:
 --allow-actions
 ```
 
-This means mutating requests remain restricted to local targets by default.
+This means mutating requests remain restricted to localhost and loopback
+targets by default. Redirects that preserve a mutating method are checked before
+the next request is sent.
 
 That behavior is intentional: a normal `git push` should never silently trigger
 a destructive request against a remote production API.

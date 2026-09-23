@@ -588,6 +588,12 @@ compare: {
 With `follow`, Yellow Jacket records whether a redirect happened and the final
 URL.
 
+For `POST`, `PUT`, `PATCH` and `DELETE`, Yellow Jacket checks redirect
+destinations before forwarding a mutating method when `--allow-actions` is not
+enabled. `307` and `308` preserve the method and body. A `301` or `302` rewrites
+`POST` to `GET`, and `303` rewrites mutating methods to `GET`, matching normal
+fetch redirect semantics.
+
 With `manual`, Yellow Jacket can also compare the redirect status and
 `Location` header directly.
 

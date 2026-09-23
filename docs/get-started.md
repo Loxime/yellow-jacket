@@ -126,7 +126,6 @@ localhost
 *.localhost
 127.0.0.0/8
 ::1
-*.local
 ```
 
 To explicitly authorize actions against another target:
@@ -145,6 +144,13 @@ yellow-jacket baseline \
 
 Use this override only for a target that is intentionally allowed to receive
 mutating requests.
+
+`.local` names are not implicitly trusted because mDNS can resolve them to a
+different machine on the local network.
+
+Redirects are checked before Yellow Jacket forwards a mutating method to their
+next destination. Use `--allow-actions` only when the complete redirect chain is
+intentionally authorized to receive actions.
 
 ## Next
 
