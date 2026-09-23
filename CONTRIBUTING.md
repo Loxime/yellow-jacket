@@ -37,6 +37,9 @@ Never include:
 
 Reduce configuration and HTTP output before publishing it.
 
+Security vulnerabilities must follow [SECURITY.md](SECURITY.md) and should not
+be disclosed in a public issue before a fix is available.
+
 ## Development
 
 Install dependencies:

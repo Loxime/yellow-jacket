@@ -901,6 +901,21 @@ or configuration.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and reporting guidance.
 
+## Security
+
+Security vulnerabilities should not be reported in public issues.
+
+See [SECURITY.md](SECURITY.md) for private reporting instructions and the
+supported security policy.
+
+## Releasing
+
+Release preparation and npm publication are documented in
+[RELEASING.md](RELEASING.md).
+
+npm releases are published from GitHub Actions with OIDC rather than a
+long-lived npm publish token.
+
 ## Development
 
 ```bash
