@@ -514,6 +514,23 @@ console.log(
     /Usage:/
   );
 
+  const versionResult =
+    await runNpm(
+      [
+        'exec',
+        '--offline',
+        '--',
+        'yellow-jacket',
+        '--version'
+      ],
+      consumerDirectory
+    );
+
+  assert.equal(
+    versionResult.stdout.trim(),
+    sourcePackage.version
+  );
+
   server =
     createServer(
       (

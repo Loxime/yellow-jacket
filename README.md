@@ -840,6 +840,8 @@ npx yellow-jacket desetup --purge
 ## Commands
 
 ```text
+yellow-jacket --version
+
 yellow-jacket init
 yellow-jacket install
 

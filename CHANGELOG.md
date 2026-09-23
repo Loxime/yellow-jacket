@@ -32,6 +32,14 @@ All notable changes to Yellow Jacket are documented in this file.
 - support Windows package-manager command shims during project removal
 - avoid POSIX-only executable-mode assumptions in Git hook tests
 
+### CLI and documentation
+
+- add `yellow-jacket --version` and `-v`
+- verify the CLI version from the packed npm artifact
+- add a current architecture reference
+- preserve the initial project design as a clearly marked historical document
+- align selection and OpenAPI troubleshooting documentation with current behavior
+
 ## 0.4.1
 
 ### Package API

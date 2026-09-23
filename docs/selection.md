@@ -95,15 +95,17 @@ If nothing matches, Yellow Jacket exits with code `2`.
 
 ## Baselines
 
-Selectors are supported by `run`, but not by `baseline`.
+Selectors are supported directly by `run`.
 
-This is intentional:
+For baseline management, selectors are supported only together with
+`--update`. A command such as:
 
 ```bash
 yellow-jacket baseline --tag smoke
 ```
 
-is rejected rather than replacing a complete baseline with a partial snapshot.
+is rejected because replacing the complete baseline with a partial snapshot
+would discard unselected responses.
 
 During a filtered `run`, Yellow Jacket filters the existing baseline to the
 selected routes and scenarios before comparison. Unselected baseline entries
