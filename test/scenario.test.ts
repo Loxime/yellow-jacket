@@ -430,3 +430,396 @@ test(
     );
   }
 );
+
+
+test(
+  'runs cleanup after a scenario failure using captured variables',
+  async (t) => {
+    const requests:
+      string[] = [];
+
+    const server =
+      createServer(
+        (
+          request,
+          response
+        ) => {
+          requests.push(
+            `${request.method ?? 'GET'} ${request.url ?? '/'}`
+          );
+
+          response.setHeader(
+            'content-type',
+            'application/json'
+          );
+
+          if (
+            request.method ===
+              'POST' &&
+            request.url ===
+              '/users'
+          ) {
+            response.statusCode =
+              201;
+
+            response.end(
+              JSON.stringify({
+                id:
+                  42
+              })
+            );
+
+            return;
+          }
+
+          if (
+            request.method ===
+              'GET' &&
+            request.url ===
+              '/users/42'
+          ) {
+            response.statusCode =
+              500;
+
+            response.end(
+              JSON.stringify({
+                error:
+                  'broken'
+              })
+            );
+
+            return;
+          }
+
+          if (
+            request.method ===
+              'DELETE' &&
+            request.url ===
+              '/users/42'
+          ) {
+            response.statusCode =
+              204;
+
+            response.end();
+
+            return;
+          }
+
+          response.statusCode =
+            404;
+
+          response.end(
+            JSON.stringify({
+              error:
+                'not found'
+            })
+          );
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => server.close()
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const results =
+      await runSuite({
+        baseUrl:
+          `http://127.0.0.1:${address.port}`,
+
+        scenarios: [
+          {
+            name:
+              'cleanup lifecycle',
+
+            steps: [
+              {
+                name:
+                  'create',
+                method:
+                  'POST',
+                path:
+                  '/users',
+                expect: {
+                  status:
+                    201
+                },
+                capture: {
+                  userId:
+                    '$.id'
+                }
+              },
+              {
+                name:
+                  'read',
+                path:
+                  '/users/{{userId}}',
+                expect: {
+                  status:
+                    200
+                }
+              },
+              {
+                name:
+                  'must not run',
+                path:
+                  '/after-failure'
+              }
+            ],
+
+            cleanup: [
+              {
+                name:
+                  'delete',
+                method:
+                  'DELETE',
+                path:
+                  '/users/{{userId}}',
+                expect: {
+                  status:
+                    204
+                }
+              }
+            ]
+          }
+        ]
+      });
+
+    assert.deepEqual(
+      requests,
+      [
+        'POST /users',
+        'GET /users/42',
+        'DELETE /users/42'
+      ]
+    );
+
+    assert.equal(
+      results.length,
+      3
+    );
+
+    assert.equal(
+      results[0]?.passed,
+      true
+    );
+
+    assert.equal(
+      results[1]?.passed,
+      false
+    );
+
+    assert.equal(
+      results[2]?.passed,
+      true
+    );
+
+    assert.equal(
+      results[2]?.route,
+      'cleanup lifecycle > cleanup > delete'
+    );
+  }
+);
+
+test(
+  'continues remaining cleanup steps after a cleanup failure',
+  async (t) => {
+    const requests:
+      string[] = [];
+
+    const server =
+      createServer(
+        (
+          request,
+          response
+        ) => {
+          requests.push(
+            `${request.method ?? 'GET'} ${request.url ?? '/'}`
+          );
+
+          response.setHeader(
+            'content-type',
+            'application/json'
+          );
+
+          if (
+            request.url ===
+              '/ready'
+          ) {
+            response.statusCode =
+              200;
+
+            response.end(
+              JSON.stringify({
+                ok:
+                  true
+              })
+            );
+
+            return;
+          }
+
+          if (
+            request.url ===
+              '/cleanup/first'
+          ) {
+            response.statusCode =
+              500;
+
+            response.end(
+              JSON.stringify({
+                cleaned:
+                  false
+              })
+            );
+
+            return;
+          }
+
+          if (
+            request.url ===
+              '/cleanup/second'
+          ) {
+            response.statusCode =
+              204;
+
+            response.end();
+
+            return;
+          }
+
+          response.statusCode =
+            404;
+
+          response.end();
+        }
+      );
+
+    server.listen(
+      0,
+      '127.0.0.1'
+    );
+
+    await once(
+      server,
+      'listening'
+    );
+
+    t.after(
+      () => server.close()
+    );
+
+    const address =
+      server.address();
+
+    assert.ok(
+      address &&
+      typeof address ===
+        'object'
+    );
+
+    const results =
+      await runSuite({
+        baseUrl:
+          `http://127.0.0.1:${address.port}`,
+
+        scenarios: [
+          {
+            name:
+              'best effort cleanup',
+
+            steps: [
+              {
+                name:
+                  'ready',
+                path:
+                  '/ready',
+                expect: {
+                  status:
+                    200
+                }
+              }
+            ],
+
+            cleanup: [
+              {
+                name:
+                  'first',
+                method:
+                  'DELETE',
+                path:
+                  '/cleanup/first',
+                expect: {
+                  status:
+                    204
+                }
+              },
+              {
+                name:
+                  'second',
+                method:
+                  'DELETE',
+                path:
+                  '/cleanup/second',
+                expect: {
+                  status:
+                    204
+                }
+              }
+            ]
+          }
+        ]
+      });
+
+    assert.deepEqual(
+      requests,
+      [
+        'GET /ready',
+        'DELETE /cleanup/first',
+        'DELETE /cleanup/second'
+      ]
+    );
+
+    assert.deepEqual(
+      results.map(
+        (result) =>
+          result.passed
+      ),
+      [
+        true,
+        false,
+        true
+      ]
+    );
+
+    assert.deepEqual(
+      results.map(
+        (result) =>
+          result.route
+      ),
+      [
+        'best effort cleanup > ready',
+        'best effort cleanup > cleanup > first',
+        'best effort cleanup > cleanup > second'
+      ]
+    );
+  }
+);

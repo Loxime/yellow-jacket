@@ -70,6 +70,7 @@ export interface ScenarioDefinition {
   name: string;
   tags?: string[];
   steps: ScenarioStep[];
+  cleanup?: ScenarioStep[];
 }
 
 export interface CompareConfig {

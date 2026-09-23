@@ -154,6 +154,29 @@ function validateSnapshotIdentities(
         `scenario[${scenarioIndex}].steps[${stepIndex}] ${label}`
       );
     }
+
+    for (
+      const [
+        stepIndex,
+        step
+      ]
+      of (
+        scenario.cleanup ??
+        []
+      ).entries()
+    ) {
+      const label =
+        `${scenario.name} > cleanup > ${step.name ?? step.path}`;
+
+      addIdentity(
+        snapshotKey(
+          step.method ??
+            'GET',
+          label
+        ),
+        `scenario[${scenarioIndex}].cleanup[${stepIndex}] ${label}`
+      );
+    }
   }
 }
 
@@ -805,6 +828,13 @@ export async function loadConfig(
       !scenario.name ||
       !Array.isArray(
         scenario.steps
+      ) ||
+      (
+        scenario.cleanup !==
+          undefined &&
+        !Array.isArray(
+          scenario.cleanup
+        )
       )
     ) {
       throw new Error(
@@ -818,50 +848,72 @@ export async function loadConfig(
     );
 
     for (
-      const step
-      of scenario.steps
-    ) {
-      const source =
-        `${path} scenario ${scenario.name} > ${step.name ?? step.path}`;
-
-      validateMethod(
-        step,
-        source
-      );
-
-      validateRedirect(
-        step,
-        source
-      );
-
-      validateTimeout(
-        step.timeoutMs,
-        source
-      );
-
-      validateExpectation(
-        step,
-        source
-      );
-
-      validateRetry(
-        step.retry,
-        source
-      );
-
-      for (
-        const [
-          variable,
-          capturePath
+      const [
+        phase,
+        steps
+      ]
+      of [
+        [
+          'step',
+          scenario.steps
+        ],
+        [
+          'cleanup',
+          scenario.cleanup ??
+            []
         ]
-        of Object.entries(
-          step.capture ?? {}
-        )
+      ] as const
+    ) {
+      for (
+        const step
+        of steps
       ) {
-        validateCapture(
-          variable,
-          capturePath
+        const source =
+          phase ===
+            'cleanup'
+            ? `${path} scenario ${scenario.name} > cleanup > ${step.name ?? step.path}`
+            : `${path} scenario ${scenario.name} > ${step.name ?? step.path}`;
+
+        validateMethod(
+          step,
+          source
         );
+
+        validateRedirect(
+          step,
+          source
+        );
+
+        validateTimeout(
+          step.timeoutMs,
+          source
+        );
+
+        validateExpectation(
+          step,
+          source
+        );
+
+        validateRetry(
+          step.retry,
+          source
+        );
+
+        for (
+          const [
+            variable,
+            capturePath
+          ]
+          of Object.entries(
+            step.capture ??
+            {}
+          )
+        ) {
+          validateCapture(
+            variable,
+            capturePath
+          );
+        }
       }
     }
   }

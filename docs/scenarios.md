@@ -157,7 +157,80 @@ A scenario stops when:
 - a variable cannot be resolved
 - a capture path cannot be resolved
 
-This prevents later steps from running with invalid state.
+This prevents later primary steps from running with invalid state.
+
+## Cleanup steps
+
+A scenario can define cleanup steps that always run after its primary steps:
+
+```js
+scenarios: [
+  {
+    name:
+      'user lifecycle',
+
+    steps: [
+      {
+        name:
+          'create user',
+        method:
+          'POST',
+        path:
+          '/users',
+        capture: {
+          userId:
+            '$.id'
+        }
+      },
+      {
+        name:
+          'verify user',
+        path:
+          '/users/{{userId}}',
+        expect: {
+          status:
+            200
+        }
+      }
+    ],
+
+    cleanup: [
+      {
+        name:
+          'delete user',
+        method:
+          'DELETE',
+        path:
+          '/users/{{userId}}',
+        expect: {
+          status:
+            204
+        }
+      }
+    ]
+  }
+]
+```
+
+Cleanup steps:
+
+- run after successful scenarios
+- run after a primary step fails
+- can reuse variables captured by earlier successful steps
+- use the same interpolation, expectations, retries, timeouts and action-safety rules
+- continue in order even when an earlier cleanup step fails
+
+Cleanup results are reported like normal scenario results using labels such as:
+
+```text
+user lifecycle > cleanup > delete user
+```
+
+They are therefore also part of baseline creation and comparison.
+
+If a cleanup references a variable that was never captured because the scenario
+failed too early, that cleanup step fails clearly and the remaining cleanup
+steps still run.
 
 ## Scenario isolation
 

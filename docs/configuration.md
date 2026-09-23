@@ -480,6 +480,10 @@ order.
 Scenarios remain sequential and are executed after the independent route set.
 Scenario steps are never parallelized.
 
+Scenarios may also declare a `cleanup` array. Cleanup steps always run after the
+primary scenario steps, reuse captured variables when available and continue on
+a best-effort basis even if an earlier cleanup fails.
+
 ## Ignore dynamic values
 
 Values that legitimately change between requests can be ignored:

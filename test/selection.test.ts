@@ -63,6 +63,17 @@ const config:
             path:
               '/pay'
           }
+        ],
+
+        cleanup: [
+          {
+            name:
+              'delete cart',
+            method:
+              'DELETE',
+            path:
+              '/cart'
+          }
         ]
       },
       {
@@ -247,6 +258,22 @@ test(
           },
           {
             route:
+              'checkout > cleanup > delete cart',
+            method:
+              'DELETE',
+            url:
+              'http://localhost/cart',
+            status:
+              204,
+            contentType:
+              null,
+            body:
+              null,
+            durationMs:
+              1
+          },
+          {
+            route:
               'admin > login',
             method:
               'GET',
@@ -287,7 +314,8 @@ test(
       ),
       [
         'checkout > create cart',
-        'checkout > pay'
+        'checkout > pay',
+        'checkout > cleanup > delete cart'
       ]
     );
 

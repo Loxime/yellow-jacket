@@ -216,6 +216,16 @@ function selectedSnapshotKeys(
         `${step.method ?? 'GET'} ${scenario.name} > ${step.name ?? step.path}`
       );
     }
+
+    for (
+      const step
+      of scenario.cleanup ??
+        []
+    ) {
+      keys.add(
+        `${step.method ?? 'GET'} ${scenario.name} > cleanup > ${step.name ?? step.path}`
+      );
+    }
   }
 
   return keys;
