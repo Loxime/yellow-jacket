@@ -7,6 +7,7 @@ import {
 import {
   appendFile,
   mkdir,
+  readFile,
   writeFile
 } from 'node:fs/promises';
 
@@ -76,10 +77,41 @@ import type {
   RunSelection
 } from './core/types.js';
 
+async function packageVersion():
+  Promise<string> {
+  const metadata =
+    JSON.parse(
+      await readFile(
+        new URL(
+          '../../package.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    ) as {
+      version?:
+        unknown;
+    };
+
+  if (
+    typeof metadata.version !==
+      'string' ||
+    metadata.version.length ===
+      0
+  ) {
+    throw new Error(
+      'Yellow Jacket package version is unavailable.'
+    );
+  }
+
+  return metadata.version;
+}
+
 function printHelp(): void {
   console.log(`yellow-jacket
 
 Usage:
+  yellow-jacket --version
   yellow-jacket init
   yellow-jacket install
   yellow-jacket desetup [--purge]
@@ -251,6 +283,10 @@ async function main():
         type: 'boolean',
         short: 'h'
       },
+      version: {
+        type: 'boolean',
+        short: 'v'
+      },
       json: {
         type: 'boolean'
       },
@@ -296,6 +332,16 @@ async function main():
   const command =
     positionals[0] ??
     'run';
+
+  if (
+    values.version
+  ) {
+    console.log(
+      await packageVersion()
+    );
+
+    return;
+  }
 
   if (
     values.help ||

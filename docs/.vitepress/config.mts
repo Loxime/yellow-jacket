@@ -72,6 +72,12 @@ export default defineConfig({
           },
           {
             text:
+              'Architecture',
+            link:
+              '/architecture'
+          },
+          {
+            text:
               'Desetup / uninstall',
             link:
               '/desetup'

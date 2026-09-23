@@ -18,7 +18,15 @@ Install Yellow Jacket as a development dependency:
 ```bash
 npm install --save-dev @falche/yellow-jacket
 ```
-The package exposes the yellow-jacket CLI command.
+The package exposes the `yellow-jacket` CLI command.
+
+Verify the installed version with:
+
+```bash
+yellow-jacket --version
+```
+
+This command does not require a Yellow Jacket configuration.
 
 ## Initialize a project
 

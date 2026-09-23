@@ -120,9 +120,10 @@ Or combine both.
 
 ## OpenAPI document rejected
 
-Yellow Jacket currently supports OpenAPI 3.x JSON documents.
+Yellow Jacket supports OpenAPI 3.x documents in JSON, YAML and YML.
 
-Verify that the document contains:
+Verify that the document declares an OpenAPI 3.x version and a `paths` object.
+For JSON, for example:
 
 ```json
 {

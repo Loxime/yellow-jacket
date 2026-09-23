@@ -36,14 +36,23 @@ import {
   fileURLToPath
 } from 'node:url';
 
+const MODULE_DIRECTORY =
+  dirname(
+    fileURLToPath(
+      import.meta.url
+    )
+  );
+
 const CLI_PATH =
   resolve(
-    dirname(
-      fileURLToPath(
-        import.meta.url
-      )
-    ),
+    MODULE_DIRECTORY,
     '../src/cli.js'
+  );
+
+const PACKAGE_JSON_PATH =
+  resolve(
+    MODULE_DIRECTORY,
+    '../../package.json'
   );
 
 interface CliResult {
@@ -119,6 +128,77 @@ function runCli(
     }
   );
 }
+
+test(
+  'prints the package version without requiring configuration',
+  async (t) => {
+    const directory =
+      await mkdtemp(
+        join(
+          tmpdir(),
+          'yellow-jacket-cli-version-'
+        )
+      );
+
+    t.after(
+      async () => {
+        await rm(
+          directory,
+          {
+            recursive:
+              true,
+            force:
+              true
+          }
+        );
+      }
+    );
+
+    const packageJson =
+      JSON.parse(
+        await readFile(
+          PACKAGE_JSON_PATH,
+          'utf8'
+        )
+      ) as {
+        version:
+          string;
+      };
+
+    for (
+      const args
+      of [
+        [
+          '--version'
+        ],
+        [
+          '-v'
+        ]
+      ]
+    ) {
+      const result =
+        await runCli(
+          args,
+          directory
+        );
+
+      assert.equal(
+        result.code,
+        0
+      );
+
+      assert.equal(
+        result.stderr,
+        ''
+      );
+
+      assert.equal(
+        result.stdout.trim(),
+        packageJson.version
+      );
+    }
+  }
+);
 
 test(
   'coverage --json emits JSON and fails below the configured minimum',
