@@ -2,6 +2,15 @@
 
 All notable changes to Yellow Jacket are documented in this file.
 
+## Unreleased
+
+### Action safety
+
+- stop treating `.local` mDNS names as implicitly safe mutation targets
+- validate redirect destinations before forwarding mutating requests
+- preserve standard redirect method semantics while enforcing action safety
+- avoid retrying requests blocked by the redirect safety guard
+
 ## 0.4.1
 
 ### Package API

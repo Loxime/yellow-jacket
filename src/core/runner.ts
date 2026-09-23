@@ -8,6 +8,7 @@ import {
 
 import type {
   HttpMethod,
+  RedirectMode,
   RetryBackoff,
   RetryConfig,
   RouteDefinition,
@@ -35,6 +36,21 @@ const DEFAULT_RETRY_STATUSES =
     503,
     504
   ] as const;
+
+const REDIRECT_STATUSES =
+  new Set([
+    301,
+    302,
+    303,
+    307,
+    308
+  ]);
+
+const MAX_SAFE_ACTION_REDIRECTS =
+  20;
+
+class ActionSafetyError
+  extends Error {}
 
 interface EffectiveRetryConfig {
   maxAttempts: number;
@@ -331,9 +347,6 @@ export function isSafeActionTarget(
     hostname.endsWith(
       '.localhost'
     ) ||
-    hostname.endsWith(
-      '.local'
-    ) ||
     isLoopbackIpv4(
       hostname
     ) ||
@@ -342,6 +355,306 @@ export function isSafeActionTarget(
     hostname ===
       '0:0:0:0:0:0:0:1'
   );
+}
+
+interface FetchedRouteResponse {
+  response: Response;
+  redirected: boolean;
+  finalUrl: string;
+}
+
+function redirectedMethod(
+  status: number,
+  method: HttpMethod
+): HttpMethod {
+  if (
+    status ===
+      303 &&
+    method !==
+      'GET' &&
+    method !==
+      'HEAD'
+  ) {
+    return 'GET';
+  }
+
+  if (
+    (
+      status ===
+        301 ||
+      status ===
+        302
+    ) &&
+    method ===
+      'POST'
+  ) {
+    return 'GET';
+  }
+
+  return method;
+}
+
+function removeRequestBodyHeaders(
+  headers: Headers
+): void {
+  for (
+    const name
+    of [
+      'content-encoding',
+      'content-language',
+      'content-length',
+      'content-location',
+      'content-type',
+      'transfer-encoding'
+    ]
+  ) {
+    headers.delete(
+      name
+    );
+  }
+}
+
+function removeSensitiveRedirectHeaders(
+  headers: Headers
+): void {
+  for (
+    const name
+    of [
+      'authorization',
+      'cookie',
+      'cookie2',
+      'host',
+      'proxy-authorization'
+    ]
+  ) {
+    headers.delete(
+      name
+    );
+  }
+}
+
+async function fetchRequest(
+  url: string | URL,
+  method: HttpMethod,
+  headers: Headers,
+  body: BodyInit | undefined,
+  redirect: RedirectMode,
+  signal: AbortSignal
+): Promise<Response> {
+  const requestInit:
+    RequestInit = {
+      method,
+      headers,
+      redirect,
+      signal
+    };
+
+  if (
+    body !==
+      undefined
+  ) {
+    requestInit.body =
+      body;
+  }
+
+  return fetch(
+    url,
+    requestInit
+  );
+}
+
+async function fetchRouteResponse(
+  url: string,
+  method: HttpMethod,
+  headers: Headers,
+  body: BodyInit | undefined,
+  redirect: RedirectMode,
+  signal: AbortSignal,
+  allowActions: boolean
+): Promise<FetchedRouteResponse> {
+  if (
+    !isActionMethod(
+      method
+    ) ||
+    allowActions ||
+    redirect !==
+      'follow'
+  ) {
+    const response =
+      await fetchRequest(
+        url,
+        method,
+        headers,
+        body,
+        redirect,
+        signal
+      );
+
+    return {
+      response,
+      redirected:
+        response.redirected,
+      finalUrl:
+        response.url ||
+        url
+    };
+  }
+
+  let currentUrl =
+    new URL(
+      url
+    );
+
+  let currentMethod =
+    method;
+
+  let currentHeaders =
+    new Headers(
+      headers
+    );
+
+  let currentBody =
+    body;
+
+  let redirectCount =
+    0;
+
+  while (
+    true
+  ) {
+    const response =
+      await fetchRequest(
+        currentUrl,
+        currentMethod,
+        currentHeaders,
+        currentBody,
+        'manual',
+        signal
+      );
+
+    const location =
+      REDIRECT_STATUSES.has(
+        response.status
+      )
+        ? response.headers.get(
+            'location'
+          )
+        : null;
+
+    if (
+      location ===
+        null
+    ) {
+      return {
+        response,
+        redirected:
+          redirectCount >
+            0,
+        finalUrl:
+          response.url ||
+          currentUrl.toString()
+      };
+    }
+
+    if (
+      redirectCount >=
+        MAX_SAFE_ACTION_REDIRECTS
+    ) {
+      await response.body
+        ?.cancel();
+
+      throw new Error(
+        'Too many redirects while checking mutating request safety.'
+      );
+    }
+
+    const nextUrl =
+      new URL(
+        location,
+        currentUrl
+      );
+
+    const nextMethod =
+      redirectedMethod(
+        response.status,
+        currentMethod
+      );
+
+    const nextHeaders =
+      new Headers(
+        currentHeaders
+      );
+
+    if (
+      currentUrl.origin !==
+        nextUrl.origin
+    ) {
+      removeSensitiveRedirectHeaders(
+        nextHeaders
+      );
+    }
+
+    redirectCount +=
+      1;
+
+    if (
+      !isActionMethod(
+        nextMethod
+      )
+    ) {
+      removeRequestBodyHeaders(
+        nextHeaders
+      );
+
+      await response.body
+        ?.cancel();
+
+      const finalResponse =
+        await fetchRequest(
+          nextUrl,
+          nextMethod,
+          nextHeaders,
+          undefined,
+          'follow',
+          signal
+        );
+
+      return {
+        response:
+          finalResponse,
+        redirected:
+          true,
+        finalUrl:
+          finalResponse.url ||
+          nextUrl.toString()
+      };
+    }
+
+    if (
+      !isSafeActionTarget(
+        nextUrl
+      )
+    ) {
+      await response.body
+        ?.cancel();
+
+      throw new ActionSafetyError(
+        `Blocked ${nextMethod} redirect to ${nextUrl.host}. Mutating redirects are allowed only to localhost and loopback targets by default. Re-run with --allow-actions to override.`
+      );
+    }
+
+    await response.body
+      ?.cancel();
+
+    currentUrl =
+      nextUrl;
+
+    currentMethod =
+      nextMethod;
+
+    currentHeaders =
+      nextHeaders;
+  }
 }
 
 function comparedResponseHeaderNames(
@@ -873,7 +1186,7 @@ export async function runRoute(
       passed:
         false,
       error:
-        `Blocked ${method} request to ${target.host}. Mutating requests are allowed only for local targets by default. Re-run with --allow-actions to override.`
+        `Blocked ${method} request to ${target.host}. Mutating requests are allowed only for localhost and loopback targets by default. Re-run with --allow-actions to override.`
     };
   }
 
@@ -953,34 +1266,25 @@ export async function runRoute(
       1
   ) {
     try {
-      const requestInit:
-        RequestInit = {
+      const fetched =
+        await fetchRouteResponse(
+          url,
           method,
           headers,
-          redirect:
-            route.redirect ??
+          body,
+          route.redirect ??
             'follow',
-          signal:
-            AbortSignal.timeout(
-              route.timeoutMs ??
+          AbortSignal.timeout(
+            route.timeoutMs ??
               config.timeoutMs ??
-                10_000
-            )
-        };
-
-      if (
-        body !==
-          undefined
-      ) {
-        requestInit.body =
-          body;
-      }
+              10_000
+          ),
+          options.allowActions ??
+            false
+        );
 
       const response =
-        await fetch(
-          url,
-          requestInit
-        );
+        fetched.response;
 
       const text =
         await response.text();
@@ -1126,11 +1430,10 @@ export async function runRoute(
           : {}),
 
         redirected:
-          response.redirected,
+          fetched.redirected,
 
         finalUrl:
-          response.url ||
-          url,
+          fetched.finalUrl,
 
         passed:
           errors.length ===
@@ -1148,6 +1451,8 @@ export async function runRoute(
       };
     } catch (error) {
       if (
+        !(error instanceof
+          ActionSafetyError) &&
         attempt <
           retry.maxAttempts
       ) {

@@ -178,7 +178,11 @@ PATCH
 DELETE
 ```
 
-are restricted to local targets by default.
+are restricted to localhost and loopback targets by default. `.local` mDNS
+names are not implicitly trusted.
+
+Redirects that preserve a mutating method are checked before the next request
+is sent.
 
 To explicitly authorize another environment:
 

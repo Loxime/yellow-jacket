@@ -90,9 +90,16 @@ test(
 
     assert.equal(
       isSafeActionTarget(
-        'http://api.local:3000'
+        'http://api.localhost:3000'
       ),
       true
+    );
+
+    assert.equal(
+      isSafeActionTarget(
+        'http://api.local:3000'
+      ),
+      false
     );
 
     assert.equal(
@@ -198,6 +205,439 @@ test(
     assert.match(
       result.error ?? '',
       /--allow-actions/
+    );
+  }
+);
+
+test(
+  'blocks mutating redirects before they leave loopback targets',
+  async (t) => {
+    const originalFetch =
+      globalThis.fetch;
+
+    const calls:
+      Array<{
+        url: string;
+        method:
+          string | undefined;
+        redirect:
+          RequestRedirect | undefined;
+      }> = [];
+
+    globalThis.fetch =
+      (async (
+        input:
+          string | URL | Request,
+        init?:
+          RequestInit
+      ) => {
+        calls.push({
+          url:
+            String(
+              input
+            ),
+          method:
+            init?.method,
+          redirect:
+            init?.redirect
+        });
+
+        return new Response(
+          null,
+          {
+            status:
+              307,
+
+            headers: {
+              location:
+                'https://api.example.test/users'
+            }
+          }
+        );
+      }) as typeof fetch;
+
+    t.after(
+      () => {
+        globalThis.fetch =
+          originalFetch;
+      }
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            'http://localhost:3000',
+
+          retries: {
+            maxAttempts:
+              3,
+
+            retryActions:
+              true
+          }
+        },
+        {
+          name:
+            'create user',
+          method:
+            'POST',
+          path:
+            '/start',
+          body: {
+            name:
+              'Yellow Jacket'
+          }
+        }
+      );
+
+    assert.equal(
+      calls.length,
+      1
+    );
+
+    assert.equal(
+      calls[0]?.method,
+      'POST'
+    );
+
+    assert.equal(
+      calls[0]?.redirect,
+      'manual'
+    );
+
+    assert.equal(
+      result.passed,
+      false
+    );
+
+    assert.equal(
+      result.attempts,
+      1
+    );
+
+    assert.match(
+      result.error ?? '',
+      /Blocked POST redirect/
+    );
+
+    assert.match(
+      result.error ?? '',
+      /api\.example\.test/
+    );
+
+    assert.match(
+      result.error ?? '',
+      /--allow-actions/
+    );
+  }
+);
+
+test(
+  'preserves mutating methods across safe 307 redirects',
+  async (t) => {
+    const originalFetch =
+      globalThis.fetch;
+
+    const calls:
+      Array<{
+        url: string;
+        method:
+          string | undefined;
+        body:
+          BodyInit | null | undefined;
+        redirect:
+          RequestRedirect | undefined;
+      }> = [];
+
+    globalThis.fetch =
+      (async (
+        input:
+          string | URL | Request,
+        init?:
+          RequestInit
+      ) => {
+        calls.push({
+          url:
+            String(
+              input
+            ),
+          method:
+            init?.method,
+          body:
+            init?.body,
+          redirect:
+            init?.redirect
+        });
+
+        if (
+          calls.length ===
+            1
+        ) {
+          return new Response(
+            null,
+            {
+              status:
+                307,
+
+              headers: {
+                location:
+                  'http://127.0.0.1:4000/created'
+              }
+            }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            created:
+              true
+          }),
+          {
+            status:
+              201,
+
+            headers: {
+              'content-type':
+                'application/json'
+            }
+          }
+        );
+      }) as typeof fetch;
+
+    t.after(
+      () => {
+        globalThis.fetch =
+          originalFetch;
+      }
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            'http://localhost:3000'
+        },
+        {
+          method:
+            'POST',
+          path:
+            '/start',
+          body: {
+            name:
+              'Yellow Jacket'
+          },
+          expect: {
+            status:
+              201
+          }
+        }
+      );
+
+    assert.equal(
+      calls.length,
+      2
+    );
+
+    assert.deepEqual(
+      calls.map(
+        (call) =>
+          call.method
+      ),
+      [
+        'POST',
+        'POST'
+      ]
+    );
+
+    assert.deepEqual(
+      calls.map(
+        (call) =>
+          call.redirect
+      ),
+      [
+        'manual',
+        'manual'
+      ]
+    );
+
+    assert.equal(
+      calls[1]?.body,
+      JSON.stringify({
+        name:
+          'Yellow Jacket'
+      })
+    );
+
+    assert.equal(
+      result.passed,
+      true
+    );
+
+    assert.equal(
+      result.redirected,
+      true
+    );
+
+    assert.equal(
+      result.finalUrl,
+      'http://127.0.0.1:4000/created'
+    );
+  }
+);
+
+test(
+  'rewrites POST to GET before following a 302 redirect',
+  async (t) => {
+    const originalFetch =
+      globalThis.fetch;
+
+    const calls:
+      Array<{
+        method:
+          string | undefined;
+        body:
+          BodyInit | null | undefined;
+        contentType:
+          string | null;
+        redirect:
+          RequestRedirect | undefined;
+      }> = [];
+
+    globalThis.fetch =
+      (async (
+        _input:
+          string | URL | Request,
+        init?:
+          RequestInit
+      ) => {
+        const requestHeaders =
+          new Headers(
+            init?.headers
+          );
+
+        calls.push({
+          method:
+            init?.method,
+          body:
+            init?.body,
+          contentType:
+            requestHeaders.get(
+              'content-type'
+            ),
+          redirect:
+            init?.redirect
+        });
+
+        if (
+          calls.length ===
+            1
+        ) {
+          return new Response(
+            null,
+            {
+              status:
+                302,
+
+              headers: {
+                location:
+                  'https://example.test/result'
+              }
+            }
+          );
+        }
+
+        return new Response(
+          'ok',
+          {
+            status:
+              200,
+
+            headers: {
+              'content-type':
+                'text/plain'
+            }
+          }
+        );
+      }) as typeof fetch;
+
+    t.after(
+      () => {
+        globalThis.fetch =
+          originalFetch;
+      }
+    );
+
+    const result =
+      await runRoute(
+        {
+          baseUrl:
+            'http://localhost:3000'
+        },
+        {
+          method:
+            'POST',
+          path:
+            '/submit',
+          body: {
+            value:
+              1
+          },
+          expect: {
+            status:
+              200
+          }
+        }
+      );
+
+    assert.equal(
+      calls.length,
+      2
+    );
+
+    assert.equal(
+      calls[0]?.method,
+      'POST'
+    );
+
+    assert.equal(
+      calls[0]?.redirect,
+      'manual'
+    );
+
+    assert.equal(
+      calls[1]?.method,
+      'GET'
+    );
+
+    assert.equal(
+      calls[1]?.body,
+      undefined
+    );
+
+    assert.equal(
+      calls[1]?.contentType,
+      null
+    );
+
+    assert.equal(
+      calls[1]?.redirect,
+      'follow'
+    );
+
+    assert.equal(
+      result.passed,
+      true
+    );
+
+    assert.equal(
+      result.redirected,
+      true
+    );
+
+    assert.equal(
+      result.finalUrl,
+      'https://example.test/result'
     );
   }
 );

@@ -652,7 +652,6 @@ localhost
 *.localhost
 127.0.0.0/8
 ::1
-*.local
 ```
 
 Explicitly authorize another target with:
@@ -662,6 +661,14 @@ npx yellow-jacket run --allow-actions
 ```
 
 The same option is available for baseline creation.
+
+Names under `.local` are not considered loopback targets because mDNS can
+resolve them to another machine on the local network.
+
+When a mutating request follows redirects, Yellow Jacket checks every redirect
+that would preserve `POST`, `PUT`, `PATCH` or `DELETE` before forwarding it.
+A redirect to a non-loopback target is blocked unless `--allow-actions` is
+explicitly enabled.
 
 ## Route coverage
 
