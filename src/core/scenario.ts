@@ -184,15 +184,23 @@ function interpolateValue(
 
 function stepLabel(
   scenario: ScenarioDefinition,
-  step: ScenarioStep
+  step: ScenarioStep,
+  cleanup = false
 ): string {
-  return `${scenario.name} > ${step.name ?? step.path}`;
+  const label =
+    step.name ??
+    step.path;
+
+  return cleanup
+    ? `${scenario.name} > cleanup > ${label}`
+    : `${scenario.name} > ${label}`;
 }
 
 function resolveScenarioStep(
   scenario: ScenarioDefinition,
   step: ScenarioStep,
-  variables: ScenarioVariables
+  variables: ScenarioVariables,
+  cleanup = false
 ): RouteDefinition {
   const {
     capture: _capture,
@@ -203,7 +211,8 @@ function resolveScenarioStep(
     ...baseRoute,
     name: stepLabel(
       scenario,
-      step
+      step,
+      cleanup
     ),
     path: interpolateText(
       step.path,
@@ -319,7 +328,8 @@ function failedStepResult(
   config: YellowJacketConfig,
   scenario: ScenarioDefinition,
   step: ScenarioStep,
-  error: unknown
+  error: unknown,
+  cleanup = false
 ): RouteRunResult {
   const method:
     HttpMethod =
@@ -339,7 +349,8 @@ function failedStepResult(
   return {
     route: stepLabel(
       scenario,
-      step
+      step,
+      cleanup
     ),
     method,
     url,
@@ -353,6 +364,110 @@ function failedStepResult(
         ? error.message
         : String(error)
   };
+}
+
+async function executeScenarioStep(
+  config: YellowJacketConfig,
+  scenario: ScenarioDefinition,
+  step: ScenarioStep,
+  variables: ScenarioVariables,
+  execute: RouteExecutor,
+  cleanup: boolean
+): Promise<RouteRunResult> {
+  let route:
+    RouteDefinition;
+
+  try {
+    route =
+      resolveScenarioStep(
+        scenario,
+        step,
+        variables,
+        cleanup
+      );
+  } catch (error) {
+    return failedStepResult(
+      config,
+      scenario,
+      step,
+      error,
+      cleanup
+    );
+  }
+
+  let result:
+    RouteRunResult;
+
+  try {
+    result =
+      await execute(
+        config,
+        route
+      );
+  } catch (error) {
+    return failedStepResult(
+      config,
+      scenario,
+      step,
+      error,
+      cleanup
+    );
+  }
+
+  if (
+    !result.passed
+  ) {
+    return result;
+  }
+
+  try {
+    for (
+      const [
+        variable,
+        path
+      ]
+      of Object.entries(
+        step.capture ??
+        {}
+      )
+    ) {
+      validateCapture(
+        variable,
+        path
+      );
+
+      const captured =
+        captureValue(
+          result.body,
+          path
+        );
+
+      if (
+        !captured.found
+      ) {
+        throw new Error(
+          `Capture "${variable}" could not resolve "${path}".`
+        );
+      }
+
+      variables[variable] =
+        captured.value;
+    }
+  } catch (error) {
+    return {
+      ...result,
+      passed:
+        false,
+      error:
+        error instanceof Error
+          ? error.message
+          : String(
+              error
+            )
+    };
+  }
+
+  return result;
 }
 
 export function validateCapture(
@@ -394,84 +509,45 @@ export async function runScenario(
     const step
     of scenario.steps
   ) {
-    let route:
-      RouteDefinition;
-
-    try {
-      route =
-        resolveScenarioStep(
-          scenario,
-          step,
-          variables
-        );
-    } catch (error) {
-      results.push(
-        failedStepResult(
-          config,
-          scenario,
-          step,
-          error
-        )
-      );
-
-      break;
-    }
-
     const result =
-      await execute(
+      await executeScenarioStep(
         config,
-        route
+        scenario,
+        step,
+        variables,
+        execute,
+        false
       );
 
-    if (!result.passed) {
-      results.push(result);
+    results.push(
+      result
+    );
+
+    if (
+      !result.passed
+    ) {
       break;
     }
+  }
 
-    try {
-      for (
-        const [
-          variable,
-          path
-        ]
-        of Object.entries(
-          step.capture ?? {}
-        )
-      ) {
-        validateCapture(
-          variable,
-          path
-        );
+  for (
+    const step
+    of scenario.cleanup ??
+      []
+  ) {
+    const result =
+      await executeScenarioStep(
+        config,
+        scenario,
+        step,
+        variables,
+        execute,
+        true
+      );
 
-        const captured =
-          captureValue(
-            result.body,
-            path
-          );
-
-        if (!captured.found) {
-          throw new Error(
-            `Capture "${variable}" could not resolve "${path}".`
-          );
-        }
-
-        variables[variable] =
-          captured.value;
-      }
-    } catch (error) {
-      results.push({
-        ...result,
-        passed: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : String(error)
-      });
-
-      break;
-    }
-
-    results.push(result);
+    results.push(
+      result
+    );
   }
 
   return results;
