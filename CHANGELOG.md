@@ -40,6 +40,22 @@ All notable changes to Yellow Jacket are documented in this file.
 - preserve the initial project design as a clearly marked historical document
 - align selection and OpenAPI troubleshooting documentation with current behavior
 
+### Scenario cleanup
+
+- add always-run cleanup steps to scenarios
+- reuse previously captured variables during cleanup
+- continue remaining cleanup steps after an earlier cleanup failure
+- include cleanup results in reports, baselines and filtered scenario selection
+
+### Release security
+
+- add an explicit security disclosure policy
+- verify tag, package, lockfile and changelog versions before publication
+- prepare npm Trusted Publishing through GitHub Actions OIDC
+- add dependency review for pull requests
+- add weekly npm and GitHub Actions dependency updates
+- document the release and recovery procedure
+
 ## 0.4.1
 
 ### Package API
