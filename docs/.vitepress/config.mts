@@ -20,6 +20,17 @@ export default defineConfig({
 
   head: [
     [
+      'link',
+      {
+        rel:
+          'icon',
+        type:
+          'image/png',
+        href:
+          '/yellow-jacket/favicon.png'
+      }
+    ],
+    [
       'meta',
       {
         name:
@@ -31,6 +42,13 @@ export default defineConfig({
   ],
 
   themeConfig: {
+    logo: {
+      src:
+        '/logo.png',
+      alt:
+        'Yellow Jacket'
+    },
+
     nav: [
       {
         text:

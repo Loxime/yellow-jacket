@@ -2,9 +2,13 @@
 layout: home
 
 hero:
-  name: "🐝 Yellow Jacket"
+  name: "Yellow Jacket"
   text: "Catch HTTP regressions before they sting."
   tagline: "Developer-first HTTP regression testing for routes and API workflows."
+
+  image:
+    src: /logo.png
+    alt: Yellow Jacket bee logo
 
   actions:
     - theme: brand
