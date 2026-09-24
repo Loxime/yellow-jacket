@@ -2,6 +2,17 @@
 
 All notable changes to Yellow Jacket are documented in this file.
 
+## 1.0.0
+
+### Stable release
+
+- promote Yellow Jacket to its first stable release after the v0.5.0 release candidate
+- keep runtime behavior unchanged from v0.5.0
+- validate npm Trusted Publishing and provenance through GitHub Actions
+- validate installation from the public npm registry and package-root exports
+- dogfood init, doctor, baseline creation and regression detection from the published package
+- verify the Git pre-push hook allows stable pushes and blocks real regression pushes
+
 ## 0.5.0
 
 ### Action safety
