@@ -31,6 +31,15 @@ export default defineConfig({
       }
     ],
     [
+      'link',
+      {
+        rel:
+          'apple-touch-icon',
+        href:
+          '/yellow-jacket/apple-touch-icon.png'
+      }
+    ],
+    [
       'meta',
       {
         name:
